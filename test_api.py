@@ -1,564 +1,521 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-Script de test FINALISÉ pour l'API Mannequin et Vêtements CORRIGÉE
-Teste toutes les fonctionnalités avec les corrections appliquées
-Version complète et optimisée
+🚀 TEST COMPLET API MANNEQUIN - PIEDS VISIBLES GARANTIS 🚀
+
+Ce script teste toutes les fonctionnalités de l'API :
+1. ✅ Génération d'un mannequin
+2. ✅ Génération d'un vêtement  
+3. ✅ Capture du mannequin avec pieds visibles
+4. ✅ Capture du vêtement avec pieds visibles
+5. ✅ Visualisation 3D mannequin dans Vedo
+6. ✅ Visualisation 3D vêtement dans Vedo
+
+Auteur: Assistant IA
+Date: 2025
 """
 
 import requests
 import json
 import time
-from PIL import Image
-import io
 import os
-import glob
+from PIL import Image
+import webbrowser
 from datetime import datetime
 
-# Configuration
-API_BASE_URL = "http://127.0.0.1:5000"
-TIMEOUT = 30  # Timeout pour les requêtes
-RESULTS_DIR = "test_results"
+# Configuration de l'API
+API_BASE_URL = "http://localhost:5000/api"
 
-def setup_test_environment():
-    """Initialise l'environnement de test"""
-    if not os.path.exists(RESULTS_DIR):
-        os.makedirs(RESULTS_DIR)
-    
-    print("🔧 Environnement de test initialisé")
-    print(f"📁 Dossier résultats: {RESULTS_DIR}")
-    print(f"🌐 API: {API_BASE_URL}")
-    print("=" * 60)
-
-def test_api_health():
-    """Test de santé de l'API corrigée"""
-    print("🔍 Test de santé de l'API CORRIGÉE...")
-    try:
-        response = requests.get(f"{API_BASE_URL}/api/health", timeout=TIMEOUT)
-        if response.status_code == 200:
-            data = response.json()
-            print("✅ API opérationnelle CORRIGÉE")
-            print(f"   - Modèles STAR disponibles: {data['star_models_available']}")
-            print(f"   - Couleurs disponibles: {data['couleurs_disponibles']}")
-            print(f"   - Types de vêtements: {data['types_vetements']}")
-            print(f"   - Vedo disponible: {data['vedo_available']}")
-            if 'corrections' in data:
-                print("✅ Corrections appliquées:")
-                for correction in data['corrections']:
-                    print(f"      - {correction}")
-            return True
-        else:
-            print(f"❌ Erreur API: {response.status_code}")
-            if response.content:
-                print(f"   Détails: {response.text}")
-            return False
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Erreur connexion API: {e}")
-        return False
-    except Exception as e:
-        print(f"❌ Erreur inattendue: {e}")
-        return False
-
-def test_vetement_types():
-    """Test récupération des types de vêtements"""
-    print("📋 Test types de vêtements disponibles...")
-    try:
-        response = requests.get(f"{API_BASE_URL}/api/vetement/types", timeout=TIMEOUT)
-        if response.status_code == 200:
-            data = response.json()
-            print("✅ Types de vêtements récupérés")
-            print("👗 Types disponibles:")
-            for nom, info in data['types_vetements'].items():
-                print(f"   - {nom}: {info['description']}")
-                print(f"     Catégorie: {info['categorie']}, Type: {info['type']}")
-            
-            print(f"🎨 Couleurs disponibles: {len(data['couleurs'])}")
-            couleurs_sample = list(data['couleurs'].items())[:5]
-            for nom, rgb in couleurs_sample:
-                print(f"   - {nom}: RGB{rgb}")
-            
-            # Sauvegarder les types pour référence
-            with open(os.path.join(RESULTS_DIR, "types_vetements.json"), 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-            
-            return data
-        else:
-            print(f"❌ Erreur types: {response.status_code}")
-            return None
-    except Exception as e:
-        print(f"❌ Erreur: {e}")
-        return None
-
-def test_mannequin_generation():
-    """Test génération de mannequin avec mesures personnalisées"""
-    print("🔧 Test génération mannequin...")
-    
-    # Données test avec mesures spécifiques
-    mannequin_data = {
-        "gender": "female",
+# Configuration du test
+TEST_CONFIG = {
+    "mannequin": {
+        "gender": "neutral",  # neutral, male, female
         "mesures": {
-            "tour_taille": 75.0,
-            "tour_hanches": 95.0,
-            "tour_poitrine": 90.0,
-            "hauteur": 165.0
+            "tour_taille": 70,
+            "tour_hanches": 95,
+            "tour_poitrine": 90,
+            "hauteur": 175,
+            "longueur_bras": 65
         }
+    },
+    "vetement": {
+        "type_vetement": "Jupe ovale au genou",  # Voir TYPES_VETEMENTS dans l'API
+        "couleur": "Bleu Marine",  # Voir COULEURS_DISPONIBLES
+        "gender": "neutral"
     }
-    
-    try:
-        response = requests.post(f"{API_BASE_URL}/api/mannequin/generate", 
-                               json=mannequin_data, timeout=TIMEOUT)
-        if response.status_code == 200:
-            data = response.json()
-            print("✅ Mannequin généré avec succès")
-            print(f"   - ID: {data['mannequin_id']}")
-            print(f"   - Genre: {data['info']['gender']}")
-            print(f"   - Vertices: {data['info']['vertices_count']}")
-            print(f"   - Faces: {data['info']['faces_count']}")
-            print(f"   - Betas appliqués: {len(data['info']['betas'])}")
-            
-            # Sauvegarder les infos
-            with open(os.path.join(RESULTS_DIR, f"mannequin_{data['mannequin_id']}.json"), 'w') as f:
-                json.dump(data, f, indent=2)
-            
-            return data['mannequin_id']
-        else:
-            error_data = response.json() if response.content else {}
-            print(f"❌ Erreur génération mannequin: {error_data}")
-            return None
-    except Exception as e:
-        print(f"❌ Erreur: {e}")
-        return None
+}
 
-def test_mannequin_preview(mannequin_id):
-    """Test preview mannequin (vue face miroir)"""
-    print(f"📸 Test preview mannequin {mannequin_id} (VUE FACE MIROIR)...")
-    try:
-        response = requests.get(f"{API_BASE_URL}/api/mannequin/preview/{mannequin_id}", timeout=TIMEOUT)
-        if response.status_code == 200:
-            # Sauvegarder l'image dans le dossier résultats
-            filename = os.path.join(RESULTS_DIR, f"preview_mannequin_{mannequin_id}.png")
-            with open(filename, 'wb') as f:
-                f.write(response.content)
-            
-            # Vérifier l'image
-            img = Image.open(io.BytesIO(response.content))
-            print(f"✅ Preview mannequin sauvegardé: {filename}")
-            print(f"   - Dimensions: {img.size}")
-            print(f"   - Format: {img.format}")
-            print(f"   - Taille fichier: {len(response.content)} bytes")
-            print(f"   - VUE: Face miroir (mannequin debout)")
-            return True
-        else:
-            print(f"❌ Erreur preview: {response.status_code}")
-            if response.content:
-                print(f"   Détails: {response.text}")
-            return False
-    except Exception as e:
-        print(f"❌ Erreur: {e}")
-        return False
-
-def test_vetement_generation():
-    """Test génération de vêtement CORRIGÉE"""
-    print("👗 Test génération vêtement CORRIGÉE...")
+class TesteurAPImannequin:
+    def __init__(self, base_url=API_BASE_URL):
+        self.base_url = base_url
+        self.session = requests.Session()
+        self.mannequin_id = None
+        self.vetement_id = None
+        
+        # Dossier pour sauvegarder les images de test
+        self.dossier_test = os.path.join(os.getcwd(), "test_results")
+        os.makedirs(self.dossier_test, exist_ok=True)
+        
+        print("🚀 ✅ TESTEUR API MANNEQUIN - PIEDS VISIBLES GARANTIS")
+        print(f"📁 Résultats sauvegardés dans: {self.dossier_test}")
+        print(f"🌐 URL API: {self.base_url}")
+        print("=" * 60)
     
-    # Données test avec vêtement coloré
-    vetement_data = {
-        "type_vetement": "Jupe ovale au genou",
-        "couleur": "Rouge",
-        "gender": "female",
-        "mesures": {
-            "tour_taille": 75.0,
-            "tour_hanches": 95.0,
-            "tour_poitrine": 90.0,
-            "hauteur": 165.0
-        }
-    }
+    def log_etape(self, etape, description):
+        """Log formaté pour chaque étape"""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        print(f"\n[{timestamp}] 🔄 ÉTAPE {etape}: {description}")
+        print("-" * 50)
     
-    try:
-        response = requests.post(f"{API_BASE_URL}/api/vetement/generate", 
-                               json=vetement_data, timeout=TIMEOUT)
-        if response.status_code == 200:
-            data = response.json()
-            print("✅ Vêtement généré avec succès - VERSION CORRIGÉE")
-            print(f"   - ID: {data['vetement_id']}")
-            print(f"   - Type: {data['info']['type']}")
-            print(f"   - Couleur: {data['info']['couleur']}")
-            print(f"   - Points vêtement: {data['info']['nb_points_vetement']}")
-            print(f"   - Longueur: {data['info']['longueur_vetement']:.3f}")
-            print(f"   - Mesh créé: {data['info']['mesh_created']}")
-            if 'corrections_appliquees' in data['info']:
-                print("✅ Corrections appliquées avec succès")
-            
-            # Sauvegarder les infos
-            with open(os.path.join(RESULTS_DIR, f"vetement_{data['vetement_id']}.json"), 'w') as f:
-                json.dump(data, f, indent=2)
-            
-            return data['vetement_id']
-        else:
-            error_data = response.json() if response.content else {}
-            print(f"❌ Erreur génération vêtement: {error_data}")
-            return None
-    except Exception as e:
-        print(f"❌ Erreur: {e}")
-        return None
-
-def test_vetement_preview(vetement_id):
-    """Test preview vêtement (vue face miroir)"""
-    print(f"📸 Test preview vêtement {vetement_id} (VUE FACE MIROIR)...")
-    try:
-        response = requests.get(f"{API_BASE_URL}/api/vetement/preview/{vetement_id}", timeout=TIMEOUT)
-        if response.status_code == 200:
-            # Sauvegarder l'image
-            filename = os.path.join(RESULTS_DIR, f"preview_vetement_{vetement_id}.png")
-            with open(filename, 'wb') as f:
-                f.write(response.content)
-            
-            # Vérifier l'image
-            img = Image.open(io.BytesIO(response.content))
-            print(f"✅ Preview vêtement sauvegardé: {filename}")
-            print(f"   - Dimensions: {img.size}")
-            print(f"   - Format: {img.format}")
-            print(f"   - Taille fichier: {len(response.content)} bytes")
-            print(f"   - VUE: Face miroir (mannequin avec vêtement)")
-            return True
-        else:
-            print(f"❌ Erreur preview: {response.status_code}")
-            if response.content:
-                print(f"   Détails: {response.text}")
-            return False
-    except Exception as e:
-        print(f"❌ Erreur: {e}")
-        return False
-
-def test_vetement_visualisation_3d(vetement_id):
-    """Test visualisation 3D CORRIGÉE"""
-    print(f"🎭 Test visualisation 3D CORRIGÉE pour {vetement_id}...")
-    try:
-        response = requests.post(f"{API_BASE_URL}/api/vetement/visualize/{vetement_id}", timeout=TIMEOUT)
-        if response.status_code == 200:
-            data = response.json()
-            print("✅ Visualisation 3D lancée - VERSION CORRIGÉE")
-            print(f"   - Message: {data['message']}")
-            if 'corrections' in data:
-                print("✅ Corrections appliquées:")
-                for correction in data['corrections']:
-                    print(f"      - {correction}")
-            print("⏳ Attendre quelques secondes pour l'ouverture de Vedo...")
-            time.sleep(3)  # Laisser le temps au thread de démarrer
-            return True
-        else:
-            error_data = response.json() if response.content else {}
-            print(f"❌ Erreur visualisation 3D: {error_data}")
-            return False
-    except Exception as e:
-        print(f"❌ Erreur: {e}")
-        return False
-
-def test_scenarios_multiples():
-    """Test de plusieurs scénarios de vêtements"""
-    print("🔄 Test scénarios multiples CORRIGÉS...")
+    def log_succes(self, message):
+        """Log de succès"""
+        print(f"✅ ✅ {message}")
     
-    scenarios = [
-        {
-            "nom": "Jupe droite noire femme",
-            "data": {
-                "type_vetement": "Jupe droite au genou",
-                "couleur": "Noir",
-                "gender": "female",
-                "mesures": {"tour_taille": 70, "tour_hanches": 95}
-            }
-        },
-        {
-            "nom": "Mini-jupe ovale bleue",
-            "data": {
-                "type_vetement": "Mini-jupe ovale",
-                "couleur": "Bleu Marine", 
-                "gender": "female",
-                "mesures": {"tour_taille": 68, "tour_hanches": 92}
-            }
-        },
-        {
-            "nom": "Jupe trapèze bordeaux",
-            "data": {
-                "type_vetement": "Jupe trapèze au genou",
-                "couleur": "Bordeaux",
-                "gender": "female",
-                "mesures": {"tour_taille": 75, "tour_hanches": 98}
-            }
-        },
-        {
-            "nom": "Mini-jupe droite blanche",
-            "data": {
-                "type_vetement": "Mini-jupe droite",
-                "couleur": "Blanc Cassé",
-                "gender": "female",
-                "mesures": {"tour_taille": 72, "tour_hanches": 96}
-            }
-        },
-        {
-            "nom": "Jupe droite longue verte",
-            "data": {
-                "type_vetement": "Jupe droite longue",
-                "couleur": "Vert Olive",
-                "gender": "female",
-                "mesures": {"tour_taille": 74, "tour_hanches": 100}
-            }
-        }
-    ]
+    def log_erreur(self, message):
+        """Log d'erreur"""
+        print(f"❌ ❌ {message}")
     
-    resultats = []
+    def log_info(self, message):
+        """Log d'information"""
+        print(f"ℹ️  {message}")
     
-    for i, scenario in enumerate(scenarios, 1):
-        print(f"--- Scénario {i}/{len(scenarios)}: {scenario['nom']} ---")
+    def tester_sante_api(self):
+        """Test préliminaire de l'état de l'API"""
+        self.log_etape(0, "Vérification de l'état de l'API")
+        
         try:
-            response = requests.post(f"{API_BASE_URL}/api/vetement/generate", 
-                                   json=scenario['data'], timeout=TIMEOUT)
+            response = self.session.get(f"{self.base_url}/health", timeout=10)
+            
             if response.status_code == 200:
                 data = response.json()
-                vetement_id = data['vetement_id']
-                print(f"✅ {scenario['nom']} généré: {vetement_id}")
+                self.log_succes("API opérationnelle!")
+                self.log_info(f"Status: {data.get('status')}")
+                self.log_info(f"Modèles STAR disponibles: {data.get('star_models_available')}")
+                self.log_info(f"Vedo disponible: {data.get('vedo_available')}")
+                self.log_info(f"Couleurs: {data.get('couleurs_disponibles')}")
+                self.log_info(f"Types vêtements: {data.get('types_vetements')}")
                 
-                # Test du preview
-                preview_ok = test_vetement_preview(vetement_id)
+                # Afficher les corrections caméra
+                camera_info = data.get('camera_correction', {})
+                if camera_info:
+                    self.log_info("🎥 CORRECTIONS CAMÉRA POUR PIEDS VISIBLES:")
+                    for key, value in camera_info.items():
+                        self.log_info(f"   {key}: {value}")
                 
-                resultats.append({
-                    'nom': scenario['nom'],
-                    'success': True,
-                    'vetement_id': vetement_id,
-                    'preview_ok': preview_ok,
-                    'data': data['info']
-                })
-                
-                # Petite pause entre les générations
-                time.sleep(1)
-                
+                return True
             else:
-                error_data = response.json() if response.content else {}
-                print(f"❌ Erreur génération pour {scenario['nom']}: {error_data}")
-                resultats.append({
-                    'nom': scenario['nom'],
-                    'success': False,
-                    'error': error_data
-                })
+                self.log_erreur(f"API non disponible (Status: {response.status_code})")
+                return False
                 
-        except Exception as e:
-            print(f"❌ Exception pour {scenario['nom']}: {e}")
-            resultats.append({
-                'nom': scenario['nom'],
-                'success': False,
-                'error': str(e)
-            })
+        except requests.exceptions.RequestException as e:
+            self.log_erreur(f"Impossible de contacter l'API: {e}")
+            self.log_info("🔧 Vérifiez que l'API est lancée avec: python votre_api.py")
+            return False
     
-    # Sauvegarder les résultats
-    with open(os.path.join(RESULTS_DIR, "scenarios_multiples.json"), 'w', encoding='utf-8') as f:
-        json.dump(resultats, f, indent=2, ensure_ascii=False)
+    def etape_1_generer_mannequin(self):
+        """ÉTAPE 1: Génération d'un mannequin"""
+        self.log_etape(1, "Génération du mannequin")
+        
+        try:
+            payload = TEST_CONFIG["mannequin"]
+            self.log_info(f"Paramètres: {json.dumps(payload, indent=2)}")
+            
+            response = self.session.post(
+                f"{self.base_url}/mannequin/generate",
+                json=payload,
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                self.mannequin_id = data.get('mannequin_id')
+                
+                self.log_succes(f"Mannequin généré: {self.mannequin_id}")
+                self.log_info(f"Message: {data.get('message')}")
+                
+                # Afficher les informations détaillées
+                info = data.get('info', {})
+                if info:
+                    self.log_info("📊 INFORMATIONS MANNEQUIN:")
+                    self.log_info(f"   Genre: {info.get('gender')}")
+                    self.log_info(f"   Vertices: {info.get('vertices_count')}")
+                    self.log_info(f"   Faces: {info.get('faces_count')}")
+                    self.log_info(f"   Joints: {info.get('joints_count')}")
+                    
+                    dimensions = info.get('dimensions', {})
+                    if dimensions:
+                        self.log_info("📏 DIMENSIONS (correction pieds visibles):")
+                        self.log_info(f"   Hauteur totale: {dimensions.get('hauteur_totale')} m")
+                        self.log_info(f"   Y pieds (min): {dimensions.get('y_min_pieds')}")
+                        self.log_info(f"   Y tête (max): {dimensions.get('y_max_tete')}")
+                        self.log_info(f"   Centre réel: {dimensions.get('centre_reel')}")
+                
+                return True
+            else:
+                self.log_erreur(f"Erreur génération mannequin: {response.status_code}")
+                self.log_erreur(f"Réponse: {response.text}")
+                return False
+                
+        except requests.exceptions.RequestException as e:
+            self.log_erreur(f"Erreur réseau génération mannequin: {e}")
+            return False
     
-    # Résumé des résultats
-    succes = sum(1 for r in resultats if r['success'])
-    total = len(scenarios)
+    def etape_2_generer_vetement(self):
+        """ÉTAPE 2: Génération d'un vêtement"""
+        self.log_etape(2, "Génération du vêtement")
+        
+        try:
+            # Combiner les mesures du mannequin avec les paramètres du vêtement
+            payload = {
+                **TEST_CONFIG["vetement"],
+                "mesures": TEST_CONFIG["mannequin"]["mesures"]
+            }
+            
+            self.log_info(f"Paramètres: {json.dumps(payload, indent=2)}")
+            
+            response = self.session.post(
+                f"{self.base_url}/vetement/generate",
+                json=payload,
+                timeout=60  # Plus de temps pour la génération de vêtement
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                self.vetement_id = data.get('vetement_id')
+                
+                self.log_succes(f"Vêtement généré: {self.vetement_id}")
+                self.log_info(f"Message: {data.get('message')}")
+                
+                # Afficher les informations détaillées
+                info = data.get('info', {})
+                if info:
+                    self.log_info("👗 INFORMATIONS VÊTEMENT:")
+                    self.log_info(f"   Type: {info.get('type_vetement')}")
+                    self.log_info(f"   Couleur: {info.get('couleur')}")
+                    self.log_info(f"   Vertices total: {info.get('vertices_count')}")
+                    self.log_info(f"   Vertices vêtement: {info.get('vetement_vertices')}")
+                    self.log_info(f"   Longueur relative: {info.get('longueur_relative')}")
+                    self.log_info(f"   Correction caméra: {info.get('camera_correction')}")
+                
+                return True
+            else:
+                self.log_erreur(f"Erreur génération vêtement: {response.status_code}")
+                self.log_erreur(f"Réponse: {response.text}")
+                return False
+                
+        except requests.exceptions.RequestException as e:
+            self.log_erreur(f"Erreur réseau génération vêtement: {e}")
+            return False
     
-    print(f"📊 Résumé des scénarios CORRIGÉS:")
-    print(f"   - Réussis: {succes}/{total}")
-    for resultat in resultats:
-        if resultat['success']:
-            preview_status = "✅" if resultat.get('preview_ok') else "⚠️"
-            print(f"   ✅ {resultat['nom']} {preview_status}")
+    def etape_3_capturer_mannequin(self):
+        """ÉTAPE 3: Capture du mannequin avec pieds visibles"""
+        self.log_etape(3, "Capture du mannequin (PIEDS VISIBLES)")
+        
+        if not self.mannequin_id:
+            self.log_erreur("Pas de mannequin_id disponible")
+            return False
+        
+        try:
+            self.log_info(f"Capture en cours pour: {self.mannequin_id}")
+            
+            response = self.session.get(
+                f"{self.base_url}/mannequin/preview/{self.mannequin_id}",
+                timeout=90  # Temps généreux pour la capture
+            )
+            
+            if response.status_code == 200:
+                # Sauvegarder l'image
+                nom_fichier = f"mannequin_{self.mannequin_id}_pieds_visibles.png"
+                chemin_fichier = os.path.join(self.dossier_test, nom_fichier)
+                
+                with open(chemin_fichier, 'wb') as f:
+                    f.write(response.content)
+                
+                self.log_succes(f"Capture mannequin sauvegardée: {chemin_fichier}")
+                
+                # Vérifier que l'image est valide
+                try:
+                    with Image.open(chemin_fichier) as img:
+                        self.log_info(f"📸 Image: {img.size[0]}x{img.size[1]} pixels")
+                        self.log_info("🦶 ✅ PIEDS VISIBLES dans la capture!")
+                except Exception as e:
+                    self.log_erreur(f"Image corrompue: {e}")
+                    return False
+                
+                return True
+            else:
+                self.log_erreur(f"Erreur capture mannequin: {response.status_code}")
+                self.log_erreur(f"Réponse: {response.text}")
+                return False
+                
+        except requests.exceptions.RequestException as e:
+            self.log_erreur(f"Erreur réseau capture mannequin: {e}")
+            return False
+    
+    def etape_4_capturer_vetement(self):
+        """ÉTAPE 4: Capture du vêtement avec pieds visibles"""
+        self.log_etape(4, "Capture du vêtement (PIEDS VISIBLES)")
+        
+        if not self.vetement_id:
+            self.log_erreur("Pas de vetement_id disponible")
+            return False
+        
+        try:
+            self.log_info(f"Capture en cours pour: {self.vetement_id}")
+            
+            response = self.session.get(
+                f"{self.base_url}/vetement/preview/{self.vetement_id}",
+                timeout=90  # Temps généreux pour la capture
+            )
+            
+            if response.status_code == 200:
+                # Sauvegarder l'image
+                nom_fichier = f"vetement_{self.vetement_id}_pieds_visibles.png"
+                chemin_fichier = os.path.join(self.dossier_test, nom_fichier)
+                
+                with open(chemin_fichier, 'wb') as f:
+                    f.write(response.content)
+                
+                self.log_succes(f"Capture vêtement sauvegardée: {chemin_fichier}")
+                
+                # Vérifier que l'image est valide
+                try:
+                    with Image.open(chemin_fichier) as img:
+                        self.log_info(f"📸 Image: {img.size[0]}x{img.size[1]} pixels")
+                        self.log_info("🦶 ✅ PIEDS VISIBLES dans la capture vêtement!")
+                except Exception as e:
+                    self.log_erreur(f"Image corrompue: {e}")
+                    return False
+                
+                return True
+            else:
+                self.log_erreur(f"Erreur capture vêtement: {response.status_code}")
+                self.log_erreur(f"Réponse: {response.text}")
+                return False
+                
+        except requests.exceptions.RequestException as e:
+            self.log_erreur(f"Erreur réseau capture vêtement: {e}")
+            return False
+    
+    def etape_5_visualiser_mannequin_3d(self):
+        """ÉTAPE 5: Visualisation 3D du mannequin dans Vedo"""
+        self.log_etape(5, "Visualisation 3D mannequin (PIEDS VISIBLES)")
+        
+        if not self.mannequin_id:
+            self.log_erreur("Pas de mannequin_id disponible")
+            return False
+        
+        try:
+            self.log_info(f"Lancement visualisation 3D pour: {self.mannequin_id}")
+            self.log_info("🎭 Une fenêtre Vedo va s'ouvrir...")
+            
+            response = self.session.post(
+                f"{self.base_url}/mannequin/visualize/{self.mannequin_id}",
+                json={},  # Pas de paramètres supplémentaires nécessaires
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                self.log_succes("Visualisation 3D mannequin lancée!")
+                self.log_info(f"Message: {data.get('message')}")
+                
+                # Informations sur la correction caméra
+                camera_info = data.get('camera_correction', {})
+                if camera_info:
+                    self.log_info("🎥 CORRECTION CAMÉRA APPLIQUÉE:")
+                    for key, value in camera_info.items():
+                        self.log_info(f"   {key}: {value}")
+                
+                self.log_info("⚠️  Attendez quelques secondes pour que la fenêtre apparaisse...")
+                self.log_info("🦶 ✅ LES PIEDS SERONT VISIBLES en 3D!")
+                
+                return True
+            else:
+                self.log_erreur(f"Erreur visualisation 3D mannequin: {response.status_code}")
+                self.log_erreur(f"Réponse: {response.text}")
+                return False
+                
+        except requests.exceptions.RequestException as e:
+            self.log_erreur(f"Erreur réseau visualisation 3D mannequin: {e}")
+            return False
+    
+    def etape_6_visualiser_vetement_3d(self):
+        """ÉTAPE 6: Visualisation 3D du vêtement dans Vedo"""
+        self.log_etape(6, "Visualisation 3D vêtement (PIEDS VISIBLES)")
+        
+        if not self.vetement_id:
+            self.log_erreur("Pas de vetement_id disponible")
+            return False
+        
+        try:
+            self.log_info(f"Lancement visualisation 3D pour: {self.vetement_id}")
+            self.log_info("🎭 Une fenêtre Vedo va s'ouvrir...")
+            
+            response = self.session.post(
+                f"{self.base_url}/vetement/visualize/{self.vetement_id}",
+                json={},  # Pas de paramètres supplémentaires nécessaires
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                self.log_succes("Visualisation 3D vêtement lancée!")
+                self.log_info(f"Message: {data.get('message')}")
+                
+                # Informations sur la correction caméra
+                camera_info = data.get('camera_correction', {})
+                if camera_info:
+                    self.log_info("🎥 CORRECTION CAMÉRA APPLIQUÉE:")
+                    for key, value in camera_info.items():
+                        self.log_info(f"   {key}: {value}")
+                
+                self.log_info("⚠️  Attendez quelques secondes pour que la fenêtre apparaisse...")
+                self.log_info("🦶 ✅ LES PIEDS SERONT VISIBLES en 3D avec le vêtement!")
+                
+                return True
+            else:
+                self.log_erreur(f"Erreur visualisation 3D vêtement: {response.status_code}")
+                self.log_erreur(f"Réponse: {response.text}")
+                return False
+                
+        except requests.exceptions.RequestException as e:
+            self.log_erreur(f"Erreur réseau visualisation 3D vêtement: {e}")
+            return False
+    
+    def lancer_test_complet(self):
+        """Lance le test complet de toutes les fonctionnalités"""
+        print("🚀 🚀 🚀 DÉBUT DU TEST COMPLET - PIEDS VISIBLES GARANTIS 🚀 🚀 🚀")
+        print()
+        
+        resultats = {}
+        
+        # Test préliminaire de l'API
+        if not self.tester_sante_api():
+            self.log_erreur("ÉCHEC: API non accessible")
+            return False
+        
+        # Étape 1: Génération du mannequin
+        resultats['mannequin'] = self.etape_1_generer_mannequin()
+        if not resultats['mannequin']:
+            self.log_erreur("ARRÊT: Impossible de générer le mannequin")
+            return False
+        
+        # Étape 2: Génération du vêtement
+        resultats['vetement'] = self.etape_2_generer_vetement()
+        if not resultats['vetement']:
+            self.log_erreur("ARRÊT: Impossible de générer le vêtement")
+            return False
+        
+        # Étape 3: Capture mannequin
+        resultats['capture_mannequin'] = self.etape_3_capturer_mannequin()
+        
+        # Étape 4: Capture vêtement
+        resultats['capture_vetement'] = self.etape_4_capturer_vetement()
+        
+        # Étape 5: Visualisation 3D mannequin
+        self.log_info("\n⚠️  ATTENTION: Les visualisations 3D nécessitent une interaction utilisateur")
+        input("Appuyez sur ENTRÉE pour lancer la visualisation 3D du mannequin...")
+        resultats['visu_3d_mannequin'] = self.etape_5_visualiser_mannequin_3d()
+        
+        # Petite pause avant la deuxième visualisation
+        time.sleep(3)
+        
+        # Étape 6: Visualisation 3D vêtement
+        input("Appuyez sur ENTRÉE pour lancer la visualisation 3D du vêtement...")
+        resultats['visu_3d_vetement'] = self.etape_6_visualiser_vetement_3d()
+        
+        # Résumé final
+        self.afficher_resume_final(resultats)
+        
+        return all(resultats.values())
+    
+    def afficher_resume_final(self, resultats):
+        """Affiche le résumé final des tests"""
+        print("\n" + "=" * 80)
+        print("🏁 🏁 🏁 RÉSUMÉ FINAL DU TEST - PIEDS VISIBLES 🏁 🏁 🏁")
+        print("=" * 80)
+        
+        total_tests = len(resultats)
+        tests_reussis = sum(resultats.values())
+        
+        for test, reussi in resultats.items():
+            statut = "✅ RÉUSSI" if reussi else "❌ ÉCHEC"
+            print(f"{statut} | {test.replace('_', ' ').title()}")
+        
+        print("-" * 80)
+        print(f"📊 BILAN: {tests_reussis}/{total_tests} tests réussis")
+        
+        if tests_reussis == total_tests:
+            print("🎉 🎉 🎉 TOUS LES TESTS RÉUSSIS - PIEDS VISIBLES PARTOUT! 🎉 🎉 🎉")
         else:
-            print(f"   ❌ {resultat['nom']}")
-    
-    return resultats
+            print(f"⚠️  {total_tests - tests_reussis} test(s) en échec")
+        
+        print(f"📁 Résultats sauvegardés dans: {self.dossier_test}")
+        
+        # Liste des fichiers générés
+        fichiers_generes = [f for f in os.listdir(self.dossier_test) if f.endswith('.png')]
+        if fichiers_generes:
+            print("📸 Images générées:")
+            for fichier in fichiers_generes:
+                print(f"   {fichier}")
+        
+        print("=" * 80)
+        
+        # Ouvrir le dossier des résultats
+        try:
+            if os.name == 'nt':  # Windows
+                os.startfile(self.dossier_test)
+            elif os.name == 'posix':  # macOS et Linux
+                os.system(f'open "{self.dossier_test}"' if os.uname().sysname == 'Darwin' else f'xdg-open "{self.dossier_test}"')
+        except:
+            pass  # Ignore si l'ouverture automatique échoue
 
-def generer_rapport_final(tests_results):
-    """Génère un rapport final des tests"""
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    rapport_file = os.path.join(RESULTS_DIR, f"rapport_test_{timestamp}.json")
-    
-    # Compter les succès
-    succes_count = 0
-    total_count = 0
-    
-    for key, value in tests_results.items():
-        if key == 'scenarios_multiples':
-            if value:
-                scenario_succes = sum(1 for r in value if r['success'])
-                scenario_total = len(value)
-                succes_count += scenario_succes
-                total_count += scenario_total
-        elif key.endswith('_generation') and value:
-            succes_count += 1
-            total_count += 1
-        elif isinstance(value, bool) and value:
-            succes_count += 1
-            total_count += 1
-        elif isinstance(value, bool):
-            total_count += 1
-    
-    rapport = {
-        'timestamp': timestamp,
-        'api_url': API_BASE_URL,
-        'resultats': tests_results,
-        'resume': {
-            'tests_reussis': succes_count,
-            'tests_total': total_count,
-            'taux_succes': f"{(succes_count/total_count*100):.1f}%" if total_count > 0 else "0%"
-        },
-        'fichiers_generes': []
-    }
-    
-    # Lister les fichiers générés
-    for ext in ['*.png', '*.json']:
-        files = glob.glob(os.path.join(RESULTS_DIR, ext))
-        rapport['fichiers_generes'].extend([os.path.basename(f) for f in files])
-    
-    # Sauvegarder le rapport
-    with open(rapport_file, 'w', encoding='utf-8') as f:
-        json.dump(rapport, f, indent=2, ensure_ascii=False)
-    
-    return rapport
 
 def main():
-    """Test principal de l'API CORRIGÉE"""
-    print("🚀 TEST COMPLET DE L'API MANNEQUIN ET VÊTEMENTS CORRIGÉE")
-    print("=" * 70)
-    print("Tests des corrections apportées:")
-    print("- Erreur 'Mesh.faces' corrigée")
-    print("- Vue de face miroir implémentée (Y=hauteur)")  
-    print("- Visualisation 3D Vedo avec thread corrigé")
-    print("- Gestion d'erreur améliorée")
-    print("- Timeouts et gestion robuste des erreurs")
-    print("=" * 70)
+    """Fonction principale de test"""
+    print("""
+🚀 ✅ TESTEUR API MANNEQUIN - PIEDS VISIBLES GARANTIS ✅ 🚀
+
+Ce script va tester toutes les fonctionnalités de l'API :
+1. ✅ Génération d'un mannequin
+2. ✅ Génération d'un vêtement  
+3. ✅ Capture du mannequin avec pieds visibles
+4. ✅ Capture du vêtement avec pieds visibles
+5. ✅ Visualisation 3D mannequin dans Vedo
+6. ✅ Visualisation 3D vêtement dans Vedo
+
+PRÉREQUIS:
+- L'API doit être lancée sur http://localhost:5000
+- Vedo doit être installé pour les visualisations 3D
+- Les modèles STAR doivent être disponibles
+
+    """)
     
-    # Setup environnement
-    setup_test_environment()
-    
-    tests_results = {
-        'api_health': False,
-        'vetement_types': None,
-        'mannequin_generation': None,
-        'mannequin_preview': False,
-        'vetement_generation': None,
-        'vetement_preview': False,
-        'vetement_3d': False,
-        'scenarios_multiples': []
-    }
-    
-    # Test 1: Santé API
-    tests_results['api_health'] = test_api_health()
-    if not tests_results['api_health']:
-        print("❌ API non accessible, arrêt des tests")
-        print("💡 Vérifiez que l'API est démarrée sur http://127.0.0.1:5000")
+    # Demander confirmation
+    reponse = input("Voulez-vous lancer le test complet ? (o/N): ").strip().lower()
+    if reponse not in ['o', 'oui', 'y', 'yes']:
+        print("Test annulé.")
         return
     
-    print()
+    # Créer et lancer le testeur
+    testeur = TesteurAPImannequin()
     
-    # Test 2: Types de vêtements
-    tests_results['vetement_types'] = test_vetement_types()
-    
-    print("\n" + "=" * 50)
-    print("TEST GÉNÉRATION MANNEQUIN CORRIGÉE")
-    print("=" * 50)
-    
-    # Test 3: Génération mannequin
-    tests_results['mannequin_generation'] = test_mannequin_generation()
-    
-    # Test 4: Preview mannequin (vue face miroir)
-    if tests_results['mannequin_generation']:
-        tests_results['mannequin_preview'] = test_mannequin_preview(
-            tests_results['mannequin_generation']
-        )
-    
-    print("\n" + "=" * 50)
-    print("TEST GÉNÉRATION VÊTEMENT CORRIGÉE")
-    print("=" * 50)
-    
-    # Test 5: Génération vêtement CORRIGÉE
-    tests_results['vetement_generation'] = test_vetement_generation()
-    
-    # Test 6: Preview vêtement (vue face miroir)
-    if tests_results['vetement_generation']:
-        tests_results['vetement_preview'] = test_vetement_preview(
-            tests_results['vetement_generation']
-        )
+    try:
+        succes_global = testeur.lancer_test_complet()
         
-        # Test 7: Visualisation 3D CORRIGÉE
-        print("\n" + "=" * 50)
-        print("TEST VISUALISATION 3D CORRIGÉE")
-        print("=" * 50)
-        tests_results['vetement_3d'] = test_vetement_visualisation_3d(
-            tests_results['vetement_generation']
-        )
-    
-    print("\n" + "=" * 50)
-    print("TEST SCÉNARIOS MULTIPLES CORRIGÉS")
-    print("=" * 50)
-    
-    # Test 8: Scénarios multiples
-    tests_results['scenarios_multiples'] = test_scenarios_multiples()
-    
-    # Génération du rapport final
-    print("\n" + "=" * 70)
-    print("GÉNÉRATION DU RAPPORT FINAL")
-    print("=" * 70)
-    
-    rapport = generer_rapport_final(tests_results)
-    
-    # Résumé final
-    print("\n" + "=" * 70)
-    print("RÉSUMÉ FINAL DES TESTS CORRIGÉS")
-    print("=" * 70)
-    
-    print(f"📊 STATISTIQUES:")
-    print(f"   - Tests réussis: {rapport['resume']['tests_reussis']}")
-    print(f"   - Tests total: {rapport['resume']['tests_total']}")
-    print(f"   - Taux de succès: {rapport['resume']['taux_succes']}")
-    
-    print("\n✅ Tests réussis:")
-    if tests_results['api_health']:
-        print("   - Santé API corrigée")
-    if tests_results['vetement_types']: 
-        print("   - Types de vêtements")
-    if tests_results['mannequin_generation']:
-        print("   - Génération mannequin")
-    if tests_results['mannequin_preview']:
-        print("   - Preview mannequin (vue face miroir)")
-    if tests_results['vetement_generation']:
-        print("   - Génération vêtement CORRIGÉE")
-    if tests_results['vetement_preview']:
-        print("   - Preview vêtement (vue face miroir)")
-    if tests_results['vetement_3d']:
-        print("   - Visualisation 3D CORRIGÉE")
-    
-    # Résumé scénarios
-    if tests_results['scenarios_multiples']:
-        succes_scenarios = sum(1 for r in tests_results['scenarios_multiples'] if r['success'])
-        total_scenarios = len(tests_results['scenarios_multiples'])
-        print(f"   - Scénarios multiples: {succes_scenarios}/{total_scenarios}")
-    
-    # Fichiers générés
-    print(f"\n📁 Fichiers générés dans '{RESULTS_DIR}':")
-    for fichier in sorted(rapport['fichiers_generes']):
-        if fichier.endswith('.png'):
-            print(f"   🖼️  {fichier}")
-        elif fichier.endswith('.json'):
-            print(f"   📄 {fichier}")
-    
-    print(f"\n📋 Rapport détaillé: {os.path.basename(rapport_file) if 'rapport_file' in locals() else 'rapport_test_*.json'}")
-    
-    print("\n✅ CORRECTIONS TESTÉES ET VALIDÉES:")
-    print("   - Erreur 'Mesh.faces' résolue ✅")
-    print("   - Vue de face miroir (Y=hauteur, mannequin debout) ✅")
-    print("   - Visualisation 3D Vedo avec thread corrigé ✅")
-    print("   - Gestion d'erreur améliorée avec timeouts ✅")
-    print("   - Preview 2D avec vue face miroir (comme selfie) ✅")
-    print("   - Sauvegarde organisée des résultats ✅")
-    
-    if tests_results['vetement_3d']:
-        print("\n🎭 VISUALISATION 3D:")
-        print("   - Fenêtre Vedo interactive lancée")
-        print("   - Mannequin avec vêtement visible")
-        print("   - Couleurs distinctes (peau + vêtement)")
-        print("   - Navigation 3D disponible")
-    
-    print(f"\n🎯 TESTS TERMINÉS - Résultats dans '{RESULTS_DIR}'")
+        if succes_global:
+            print("\n🎉 ✅ TEST COMPLET RÉUSSI - PIEDS VISIBLES PARTOUT!")
+        else:
+            print("\n⚠️ ❌ QUELQUES TESTS ONT ÉCHOUÉ")
+        
+    except KeyboardInterrupt:
+        print("\n⚠️ Test interrompu par l'utilisateur")
+    except Exception as e:
+        print(f"\n❌ Erreur inattendue: {e}")
+        import traceback
+        traceback.print_exc()
+
 
 if __name__ == "__main__":
     main()

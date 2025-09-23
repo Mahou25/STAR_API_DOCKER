@@ -1,0 +1,51 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test WebView - IP Dynamique</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: Arial, sans-serif;
+            color: white;
+            text-align: center;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .test-box {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 20px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+    </style>
+</head>
+<body>
+    <div class="test-box">
+        <h1>✅ WebView Test - IP Dynamique</h1>
+        <p>Si vous voyez ce message, le WebView fonctionne !</p>
+        <p>URL: http://192.168.43.6:5000</p>
+        <p>IP détectée automatiquement: 192.168.43.6</p>
+        <div id="timer">Loading...</div>
+    </div>
+    
+    <script>
+        let seconds = 0;
+        function updateTimer() {
+            document.getElementById('timer').textContent = 
+                `Temps écoulé: ${seconds} secondes`;
+            seconds++;
+        }
+        setInterval(updateTimer, 1000);
+        updateTimer();
+    </script>
+</body>
+</html>
+    

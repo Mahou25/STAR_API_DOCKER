@@ -24,6 +24,7 @@ import socket
 
 
 
+
 def convertir_numpy_pour_json(obj):
     """
     Convertit récursivement les types NumPy en types Python natifs pour la sérialisation JSON

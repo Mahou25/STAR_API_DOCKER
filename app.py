@@ -935,7 +935,7 @@ def valider_type_vetement(type_saisi):
 
 # ============== ROUTES WEBVIEW CORRIGÉES ==============
 def get_local_ip():
-    """Récupère l'IP locale dynamiquement"""
+    """Récupère l'IP locale dynamiquement (pour dev uniquement)"""
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
@@ -943,15 +943,37 @@ def get_local_ip():
         s.close()
         return ip
     except Exception:
-        return "192.168.43.6"  # Fallback
+        return "127.0.0.1"
+    
+
+def get_environment():
+    """Détermine si on est en production ou développement"""
+    # Render définit automatiquement cette variable
+    return os.environ.get('RENDER', 'false') == 'true' or \
+           os.environ.get('ENVIRONMENT', 'development') == 'production'
+
+def get_base_url():
+    """Retourne l'URL de base selon l'environnement"""
+    if get_environment():
+        # URL de production Render
+        return "https://star-api-docker.onrender.com"
+    else:
+        # URL locale pour développement
+        local_ip = get_local_ip()
+        return f"http://{local_ip}:5000"
+
+
 
 # ✅ VARIABLE GLOBALE IP DYNAMIQUE
-LOCAL_IP = get_local_ip()
-print(f"🌐 IP locale détectée: {LOCAL_IP}")
+IS_PRODUCTION = get_environment()
+BASE_URL = get_base_url()
+
+print(f"🌍 Environnement: {'PRODUCTION' if IS_PRODUCTION else 'DÉVELOPPEMENT'}")
+print(f"🔗 Base URL: {BASE_URL}")
 
 @app.route('/api/mannequin/webview/<mannequin_id>', methods=['GET'])
 def generate_mannequin_webview(mannequin_id):
-    """✅ CORRIGÉ - Utilise LOCAL_IP au lieu d'IP hardcodée"""
+    """✅ CORRIGÉ - Utilise BASE_URL adaptative"""
     try:
         temp_file = os.path.join(TEMP_DIR, f"{mannequin_id}.npz")
         if not os.path.exists(temp_file):
@@ -970,17 +992,17 @@ def generate_mannequin_webview(mannequin_id):
         with open(html_file, 'w', encoding='utf-8') as f:
             f.write(html_content)
         
-        # 🚨 CORRECTION CRITIQUE : Utiliser LOCAL_IP
-        webview_url = f"http://{LOCAL_IP}:5000/webview/{mannequin_id}_webview.html"
+        # ✅ CORRECTION: Utiliser BASE_URL adaptatif
+        webview_url = f"{BASE_URL}/webview/{mannequin_id}_webview.html"
         
-        print(f"✅ URL générée: {webview_url}")
-        print(f"✅ IP utilisée: {LOCAL_IP}")
+        print(f"✅ URL générée ({('PROD' if IS_PRODUCTION else 'DEV')}): {webview_url}")
         
         return jsonify({
             'success': True,
-            'url': webview_url,  # ← Cette URL doit contenir l'IP réelle
+            'url': webview_url,
             'visualization_url': webview_url,
-            'ip_used': LOCAL_IP,
+            'environment': 'production' if IS_PRODUCTION else 'development',
+            'base_url': BASE_URL,
             'debug_info': {
                 'vertices_count': len(vertices),
                 'faces_count': len(faces),
@@ -994,9 +1016,10 @@ def generate_mannequin_webview(mannequin_id):
         print(f"❌ Erreur génération WebView mannequin: {e}")
         return jsonify({'error': str(e)}), 500
 
+
 @app.route('/api/vetement/webview/<vetement_id>', methods=['GET'])
 def generate_vetement_webview(vetement_id):
-    """✅ CORRIGÉ - Utilise LOCAL_IP au lieu d'IP hardcodée"""
+    """✅ CORRIGÉ - Utilise BASE_URL adaptative"""
     try:
         temp_file = os.path.join(TEMP_DIR, f"{vetement_id}.npz")
         if not os.path.exists(temp_file):
@@ -1021,17 +1044,17 @@ def generate_vetement_webview(vetement_id):
         with open(html_file, 'w', encoding='utf-8') as f:
             f.write(html_content)
         
-        # 🚨 CORRECTION CRITIQUE : Utiliser LOCAL_IP
-        webview_url = f"http://{LOCAL_IP}:5000/webview/{vetement_id}_webview.html"
+        # ✅ CORRECTION: Utiliser BASE_URL adaptatif
+        webview_url = f"{BASE_URL}/webview/{vetement_id}_webview.html"
         
-        print(f"✅ URL générée: {webview_url}")
-        print(f"✅ IP utilisée: {LOCAL_IP}")
+        print(f"✅ URL générée ({('PROD' if IS_PRODUCTION else 'DEV')}): {webview_url}")
         
         return jsonify({
             'success': True,
-            'url': webview_url,  # ← Cette URL doit contenir l'IP réelle
+            'url': webview_url,
             'visualization_url': webview_url,
-            'ip_used': LOCAL_IP,
+            'environment': 'production' if IS_PRODUCTION else 'development',
+            'base_url': BASE_URL,
             'message': f'Visualisation WebView générée pour {type_vetement} {couleur}'
         })
         
@@ -1039,17 +1062,17 @@ def generate_vetement_webview(vetement_id):
         print(f"❌ Erreur génération WebView vêtement: {e}")
         return jsonify({'error': str(e)}), 500
 
+
 @app.route('/api/webview/test', methods=['GET'])
 def test_webview():
-    """✅ Route de test corrigée avec IP dynamique"""
-    # HTML de test avec IP dynamique
+    """✅ Route de test corrigée avec URL adaptative"""
     test_html = f"""
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test WebView - IP Dynamique</title>
+    <title>Test WebView - {'Production' if IS_PRODUCTION else 'Développement'}</title>
     <style>
         body {{
             margin: 0;
@@ -1074,10 +1097,10 @@ def test_webview():
 </head>
 <body>
     <div class="test-box">
-        <h1>✅ WebView Test - IP Dynamique</h1>
+        <h1>✅ WebView Test</h1>
         <p>Si vous voyez ce message, le WebView fonctionne !</p>
-        <p>URL: http://{LOCAL_IP}:5000</p>
-        <p>IP détectée automatiquement: {LOCAL_IP}</p>
+        <p>Environnement: <strong>{'PRODUCTION' if IS_PRODUCTION else 'DÉVELOPPEMENT'}</strong></p>
+        <p>URL: <strong>{BASE_URL}</strong></p>
         <div id="timer">Loading...</div>
     </div>
     
@@ -1095,22 +1118,22 @@ def test_webview():
 </html>
     """
     
-    # Sauvegarder le fichier de test
     test_file = os.path.join(PREVIEW_DIR, "test_webview.html")
     with open(test_file, 'w', encoding='utf-8') as f:
         f.write(test_html)
     
-    # 🚨 CORRECTION CRITIQUE : Utiliser LOCAL_IP
-    test_url = f"http://{LOCAL_IP}:5000/webview/test_webview.html"
+    # ✅ CORRECTION: Utiliser BASE_URL adaptatif
+    test_url = f"{BASE_URL}/webview/test_webview.html"
     
     print(f"✅ URL de test générée: {test_url}")
     
     return jsonify({
         'success': True,
-        'url': test_url,  # ← Cette URL doit contenir l'IP réelle
+        'url': test_url,
         'test_url': test_url,
-        'ip_detected': LOCAL_IP,
-        'message': 'Page de test WebView générée avec IP dynamique'
+        'environment': 'production' if IS_PRODUCTION else 'development',
+        'base_url': BASE_URL,
+        'message': f'Page de test WebView générée - {("Production" if IS_PRODUCTION else "Développement")}'
     })
 
 # ===============================================
@@ -1119,17 +1142,20 @@ def test_webview():
 
 @app.route('/api/debug/urls', methods=['GET'])
 def debug_urls():
-    """Route de debug pour vérifier les URLs générées"""
+    """Route de debug pour vérifier les URLs"""
     return jsonify({
-        'local_ip': LOCAL_IP,
-        'base_url': f"http://{LOCAL_IP}:5000",
-        'webview_base': f"http://{LOCAL_IP}:5000/webview/",
+        'environment': 'production' if IS_PRODUCTION else 'development',
+        'base_url': BASE_URL,
+        'webview_base': f"{BASE_URL}/webview/",
         'test_urls': {
-            'test_webview': f"http://{LOCAL_IP}:5000/webview/test_webview.html",
-            'mannequin_example': f"http://{LOCAL_IP}:5000/webview/MANNEQUIN_ID_webview.html",
-            'vetement_example': f"http://{LOCAL_IP}:5000/webview/VETEMENT_ID_webview.html"
-        }
+            'test_webview': f"{BASE_URL}/webview/test_webview.html",
+            'mannequin_example': f"{BASE_URL}/webview/MANNEQUIN_ID_webview.html",
+            'vetement_example': f"{BASE_URL}/webview/VETEMENT_ID_webview.html"
+        },
+        'render_env': os.environ.get('RENDER', 'Not set'),
+        'custom_env': os.environ.get('ENVIRONMENT', 'Not set')
     })
+
 
 
 @app.route('/', methods=['GET'])
@@ -2615,13 +2641,17 @@ def visualize_mannequin_3d(mannequin_id):
 
 
 if __name__ == '__main__':
-    print(f"🚀 Démarrage serveur Flask sur 0.0.0.0:5000")
-    print(f"🌐 IP locale détectée: {LOCAL_IP}")
-    print(f"📱 URLs mobiles utiliseront: http://{LOCAL_IP}:5000")
+    port = int(os.environ.get('PORT', 5000))
+    
+    print(f"🚀 Démarrage serveur Flask")
+    print(f"🌍 Environnement: {'PRODUCTION (Render)' if IS_PRODUCTION else 'DÉVELOPPEMENT (Local)'}")
+    print(f"🔗 Base URL: {BASE_URL}")
+    print(f"🔌 Port: {port}")
+    
     
     app.run(
         host='0.0.0.0',  # ← Important : écouter sur toutes les interfaces
-        port=5000,
-        debug=True
+        port=port,
+        debug=not IS_PRODUCTION  # Debug désactivé en production
     )
     

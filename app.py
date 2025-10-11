@@ -1132,6 +1132,11 @@ def debug_urls():
     })
 
 
+@app.route('/', methods=['GET'])
+def test():
+    return jsonify({'test': 'helle'})
+
+
 @app.route('/api/data/<model_id>', methods=['GET'])
 def get_model_data(model_id):
     """Retourne les données 3D en JSON pour debug"""

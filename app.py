@@ -2135,15 +2135,309 @@ def generate_vetement():
         return jsonify({'error': str(e)}), 500
 
 
+
+
+
+def generer_html_vetement_preview(vertices_corps, vertices_avec_vetement, faces, masque_vetement, couleur, type_vetement):
+    """Génère une page HTML Three.js compacte pour preview vêtement"""
+    
+    vertices_corps_json = json.dumps(vertices_corps.tolist())
+    vertices_vetement_json = json.dumps(vertices_avec_vetement.tolist())
+    faces_json = json.dumps(faces.tolist())
+    masque_json = json.dumps(masque_vetement.tolist())
+    
+    couleur_rgb = COULEURS_DISPONIBLES.get(couleur, [128, 128, 128])
+    couleur_normalized = [c/255.0 for c in couleur_rgb]
+    couleur_json = json.dumps(couleur_normalized)
+    
+    html_template = f"""
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{type_vetement} {couleur}</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        * {{ margin: 0; padding: 0; }}
+        body {{ 
+            width: 100vw; 
+            height: 100vh; 
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+        }}
+        #canvas {{ display: block; }}
+        #info {{
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            z-index: 10;
+        }}
+        .color-swatch {{
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+            background-color: rgb({couleur_rgb[0]}, {couleur_rgb[1]}, {couleur_rgb[2]});
+            vertical-align: middle;
+            margin-right: 5px;
+            border: 1px solid rgba(255,255,255,0.5);
+        }}
+        #loading {{
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            z-index: 100;
+        }}
+    </style>
+</head>
+<body>
+    <div id="loading">Chargement du vêtement...</div>
+    <div id="info">
+        <strong>{type_vetement}</strong><br>
+        <span class="color-swatch"></span>{couleur}<br>
+        Glissez pour tourner
+    </div>
+
+    <script>
+        let scene, camera, renderer;
+        let meshCorps, meshVetement;
+        let rotationX = 0, rotationY = 0;
+        let mouseDown = false, prevX = 0, prevY = 0;
+
+        const verticesCorps = {vertices_corps_json};
+        const verticesVetement = {vertices_vetement_json};
+        const faces = {faces_json};
+        const masque = {masque_json};
+        const couleur = {couleur_json};
+
+        function init() {{
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xfafafa);
+
+            const yValues = verticesCorps.map(v => v[1]);
+            const yMin = Math.min(...yValues);
+            const yMax = Math.max(...yValues);
+            const hauteur = yMax - yMin;
+            const centreY = (yMin + yMax) / 2;
+
+            camera = new THREE.PerspectiveCamera(
+                55, 
+                window.innerWidth / window.innerHeight, 
+                0.1, 
+                1000
+            );
+            
+            const dist = Math.max(2, hauteur * 2.2);
+            camera.position.set(0, centreY * 0.8, dist);
+            camera.lookAt(0, centreY, 0);
+
+            renderer = new THREE.WebGLRenderer({{ antialias: true }});
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.body.appendChild(renderer.domElement);
+
+            // Corps
+            const geometryCorps = new THREE.BufferGeometry();
+            geometryCorps.setAttribute('position', 
+                new THREE.BufferAttribute(new Float32Array(verticesCorps.flat()), 3)
+            );
+            geometryCorps.setIndex(
+                new THREE.BufferAttribute(new Uint32Array(faces.flat()), 1)
+            );
+            geometryCorps.computeVertexNormals();
+
+            const materialCorps = new THREE.MeshPhongMaterial({{
+                color: 0xd4a574,
+                shininess: 20,
+                opacity: 0.85,
+                transparent: true,
+                side: THREE.DoubleSide
+            }});
+
+            meshCorps = new THREE.Mesh(geometryCorps, materialCorps);
+            scene.add(meshCorps);
+
+            // Vêtement
+            const verticesVetOnly = [];
+            const facesVetOnly = [];
+            const indexMap = new Map();
+            let newIdx = 0;
+
+            for (let i = 0; i < masque.length; i++) {{
+                if (masque[i]) {{
+                    verticesVetOnly.push(...verticesVetement[i]);
+                    indexMap.set(i, newIdx);
+                    newIdx++;
+                }}
+            }}
+
+            for (let i = 0; i < faces.length; i++) {{
+                const [v1, v2, v3] = faces[i];
+                if (masque[v1] && masque[v2] && masque[v3]) {{
+                    const nv1 = indexMap.get(v1);
+                    const nv2 = indexMap.get(v2);
+                    const nv3 = indexMap.get(v3);
+                    if (nv1 !== undefined && nv2 !== undefined && nv3 !== undefined) {{
+                        facesVetOnly.push([nv1, nv2, nv3]);
+                    }}
+                }}
+            }}
+
+            if (verticesVetOnly.length > 0 && facesVetOnly.length > 0) {{
+                const geometryVet = new THREE.BufferGeometry();
+                geometryVet.setAttribute('position',
+                    new THREE.BufferAttribute(new Float32Array(verticesVetOnly), 3)
+                );
+                geometryVet.setIndex(
+                    new THREE.BufferAttribute(new Uint32Array(facesVetOnly.flat()), 1)
+                );
+                geometryVet.computeVertexNormals();
+
+                const materialVet = new THREE.MeshPhongMaterial({{
+                    color: new THREE.Color(couleur[0], couleur[1], couleur[2]),
+                    shininess: 15,
+                    opacity: 0.95,
+                    transparent: true,
+                    side: THREE.DoubleSide
+                }});
+
+                meshVetement = new THREE.Mesh(geometryVet, materialVet);
+                scene.add(meshVetement);
+            }}
+
+            // Lumières
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(5, 10, 5);
+            scene.add(directionalLight);
+
+            // Contrôles
+            document.addEventListener('mousedown', onMouseDown);
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+            document.addEventListener('touchstart', onTouchStart);
+            document.addEventListener('touchmove', onTouchMove);
+            document.addEventListener('touchend', onTouchEnd);
+
+            document.getElementById('loading').style.display = 'none';
+            animate();
+        }}
+
+        function onMouseDown(e) {{
+            mouseDown = true;
+            prevX = e.clientX;
+            prevY = e.clientY;
+        }}
+
+        function onMouseMove(e) {{
+            if (!mouseDown) return;
+            
+            const deltaX = e.clientX - prevX;
+            const deltaY = e.clientY - prevY;
+            
+            rotationY += deltaX * 0.005;
+            rotationX += deltaY * 0.005;
+            
+            if (meshCorps) {{
+                meshCorps.rotation.order = 'YXZ';
+                meshCorps.rotation.y = rotationY;
+                meshCorps.rotation.x = rotationX;
+            }}
+            if (meshVetement) {{
+                meshVetement.rotation.order = 'YXZ';
+                meshVetement.rotation.y = rotationY;
+                meshVetement.rotation.x = rotationX;
+            }}
+            
+            prevX = e.clientX;
+            prevY = e.clientY;
+        }}
+
+        function onMouseUp() {{
+            mouseDown = false;
+        }}
+
+        let touchStart = null;
+
+        function onTouchStart(e) {{
+            if (e.touches.length === 1) {{
+                touchStart = {{ x: e.touches[0].clientX, y: e.touches[0].clientY }};
+            }}
+        }}
+
+        function onTouchMove(e) {{
+            if (!touchStart || e.touches.length !== 1) return;
+            
+            const deltaX = e.touches[0].clientX - touchStart.x;
+            const deltaY = e.touches[0].clientY - touchStart.y;
+            
+            rotationY += deltaX * 0.005;
+            rotationX += deltaY * 0.005;
+            
+            if (meshCorps) {{
+                meshCorps.rotation.order = 'YXZ';
+                meshCorps.rotation.y = rotationY;
+                meshCorps.rotation.x = rotationX;
+            }}
+            if (meshVetement) {{
+                meshVetement.rotation.order = 'YXZ';
+                meshVetement.rotation.y = rotationY;
+                meshVetement.rotation.x = rotationX;
+            }}
+            
+            touchStart = {{ x: e.touches[0].clientX, y: e.touches[0].clientY }};
+        }}
+
+        function onTouchEnd() {{
+            touchStart = null;
+        }}
+
+        function animate() {{
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }}
+
+        window.addEventListener('resize', () => {{
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }});
+
+        init();
+    </script>
+</body>
+</html>
+    """
+    
+    return html_template
+
+
+
+
+
 @app.route('/api/vetement/preview/<vetement_id>', methods=['GET'])
 def get_vetement_preview(vetement_id):
-    """✅ Route corrigée pour générer et retourner une image de preview"""
+    """✅ Preview en HTML Three.js - Pas de Vedo requis"""
     try:
         temp_file = os.path.join(TEMP_DIR, f"{vetement_id}.npz")
         if not os.path.exists(temp_file):
             return jsonify({'error': 'Vêtement non trouvé'}), 404
         
-        # Charger les données du vêtement
         data = np.load(temp_file, allow_pickle=True)
         vertices_corps = data['vertices_corps']
         vertices_avec_vetement = data['vertices_avec_vetement']
@@ -2152,60 +2446,32 @@ def get_vetement_preview(vetement_id):
         couleur = str(data['couleur'])
         type_vetement = str(data['type_vetement'])
         
-        print(f"🖼️ Génération preview pour {vetement_id}: {type_vetement} {couleur}")
+        # Générer la page HTML (pas de PNG, pas de Vedo!)
+        html_content = generer_html_vetement_preview(
+            vertices_corps, vertices_avec_vetement, faces, 
+            masque_vetement, couleur, type_vetement
+        )
         
-        # Nom du fichier de preview
-        preview_file = os.path.join(PREVIEW_DIR, f"{vetement_id}_preview.png")
+        # Sauvegarder le fichier HTML
+        html_file = os.path.join(PREVIEW_DIR, f"{vetement_id}_preview.html")
+        with open(html_file, 'w', encoding='utf-8') as f:
+            f.write(html_content)
         
-        # Vérifier si le preview existe déjà
-        if os.path.exists(preview_file):
-            print(f"✅ Preview existant trouvé: {preview_file}")
-            return send_file(
-                preview_file,
-                mimetype='image/png',
-                as_attachment=False
-            )
+        # Retourner l'URL de la page HTML
+        webview_url = f"{BASE_URL}/webview/{vetement_id}_preview.html"
         
-        # Générer le preview s'il n'existe pas
-        if VEDO_AVAILABLE:
-            try:
-                # Recreer le mesh du vêtement pour la capture
-                mesh_vetement_data = VetementGenerator.creer_mesh_jupe_separe(
-                    vertices_avec_vetement, masque_vetement, couleur
-                )
-                
-                # Capturer l'image
-                success = visualisateur.capturer_rendu_3d_vedo(
-                    vertices_corps, faces, masque_vetement,
-                    vertices_avec_vetement, mesh_vetement_data,
-                    preview_file, 
-                    titre=f"{type_vetement} {couleur}"
-                )
-                
-                if success and os.path.exists(preview_file):
-                    print(f"✅ Preview généré avec succès: {preview_file}")
-                    return send_file(
-                        preview_file,
-                        mimetype='image/png',
-                        as_attachment=False
-                    )
-                else:
-                    raise Exception("Échec de la génération de l'image")
-                    
-            except Exception as e:
-                print(f"❌ Erreur génération preview Vedo: {e}")
-                # Fallback vers une image générée avec matplotlib
-                return generate_fallback_preview(vetement_id, type_vetement, couleur, vertices_avec_vetement)
-        else:
-            # Vedo non disponible, utiliser matplotlib
-            return generate_fallback_preview(vetement_id, type_vetement, couleur, vertices_avec_vetement)
-            
+        return jsonify({
+            'success': True,
+            'preview_url': webview_url,
+            'type': 'html_three_js',  # Important: type d'aperçu
+            'message': f'Aperçu {type_vetement} {couleur} prêt'
+        })
+        
     except Exception as e:
-        print(f"❌ Erreur preview vêtement {vetement_id}: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': f'Erreur génération preview: {str(e)}'}), 500
-
+        print(f"❌ Erreur preview vêtement: {e}")
+        return jsonify({'error': str(e)}), 500
+    
+    
 
 def generate_fallback_preview(vetement_id, type_vetement, couleur, vertices):
     """Génère un preview de fallback avec matplotlib si Vedo échoue"""
@@ -2493,10 +2759,224 @@ def generate_mannequin():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
     
+
+
+def generer_html_mannequin_preview(vertices, faces, gender):
+    """Génère une page HTML Three.js compacte pour preview mannequin"""
+    
+    vertices_json = json.dumps(vertices.tolist())
+    faces_json = json.dumps(faces.tolist())
+    
+    html_template = f"""
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mannequin {gender} - Aperçu</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        * {{ margin: 0; padding: 0; }}
+        body {{ 
+            width: 100vw; 
+            height: 100vh; 
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+        }}
+        #canvas {{ display: block; }}
+        #info {{
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            z-index: 10;
+        }}
+        #loading {{
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            z-index: 100;
+        }}
+    </style>
+</head>
+<body>
+    <div id="loading">Chargement du mannequin...</div>
+    <div id="info">
+        <strong>Mannequin {gender}</strong><br>
+        Vertices: {len(vertices)}<br>
+        Glissez pour tourner
+    </div>
+
+    <script>
+        let scene, camera, renderer, mannequin;
+        let rotationX = 0, rotationY = 0;
+        let mouseDown = false, prevX = 0, prevY = 0;
+
+        const vertices = {vertices_json};
+        const faces = {faces_json};
+
+        function init() {{
+            // Scène et caméra
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xfafafa);
+
+            const yValues = vertices.map(v => v[1]);
+            const yMin = Math.min(...yValues);
+            const yMax = Math.max(...yValues);
+            const hauteur = yMax - yMin;
+            const centreY = (yMin + yMax) / 2;
+
+            camera = new THREE.PerspectiveCamera(
+                55, 
+                window.innerWidth / window.innerHeight, 
+                0.1, 
+                1000
+            );
+            
+            const dist = Math.max(2, hauteur * 2.2);
+            camera.position.set(0, centreY * 0.8, dist);
+            camera.lookAt(0, centreY, 0);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({{ antialias: true }});
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.body.appendChild(renderer.domElement);
+
+            // Géométrie
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', 
+                new THREE.BufferAttribute(new Float32Array(vertices.flat()), 3)
+            );
+            geometry.setIndex(
+                new THREE.BufferAttribute(new Uint32Array(faces.flat()), 1)
+            );
+            geometry.computeVertexNormals();
+
+            // Matériau
+            const material = new THREE.MeshPhongMaterial({{
+                color: 0xd4a574,
+                shininess: 20,
+                side: THREE.DoubleSide
+            }});
+
+            mannequin = new THREE.Mesh(geometry, material);
+            scene.add(mannequin);
+
+            // Lumières
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(5, 10, 5);
+            scene.add(directionalLight);
+
+            // Contrôles souris
+            document.addEventListener('mousedown', onMouseDown);
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+
+            // Tactile
+            document.addEventListener('touchstart', onTouchStart);
+            document.addEventListener('touchmove', onTouchMove);
+            document.addEventListener('touchend', onTouchEnd);
+
+            document.getElementById('loading').style.display = 'none';
+            animate();
+        }}
+
+        function onMouseDown(e) {{
+            mouseDown = true;
+            prevX = e.clientX;
+            prevY = e.clientY;
+        }}
+
+        function onMouseMove(e) {{
+            if (!mouseDown) return;
+            
+            const deltaX = e.clientX - prevX;
+            const deltaY = e.clientY - prevY;
+            
+            rotationY += deltaX * 0.005;
+            rotationX += deltaY * 0.005;
+            
+            mannequin.rotation.order = 'YXZ';
+            mannequin.rotation.y = rotationY;
+            mannequin.rotation.x = rotationX;
+            
+            prevX = e.clientX;
+            prevY = e.clientY;
+        }}
+
+        function onMouseUp() {{
+            mouseDown = false;
+        }}
+
+        let touchStart = null;
+
+        function onTouchStart(e) {{
+            if (e.touches.length === 1) {{
+                touchStart = {{ x: e.touches[0].clientX, y: e.touches[0].clientY }};
+            }}
+        }}
+
+        function onTouchMove(e) {{
+            if (!touchStart || e.touches.length !== 1) return;
+            
+            const deltaX = e.touches[0].clientX - touchStart.x;
+            const deltaY = e.touches[0].clientY - touchStart.y;
+            
+            rotationY += deltaX * 0.005;
+            rotationX += deltaY * 0.005;
+            
+            mannequin.rotation.order = 'YXZ';
+            mannequin.rotation.y = rotationY;
+            mannequin.rotation.x = rotationX;
+            
+            touchStart = {{ x: e.touches[0].clientX, y: e.touches[0].clientY }};
+        }}
+
+        function onTouchEnd() {{
+            touchStart = null;
+        }}
+
+        function animate() {{
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }}
+
+        window.addEventListener('resize', () => {{
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }});
+
+        init();
+    </script>
+</body>
+</html>
+    """
+    
+    return html_template
+
+
+
+    
     
 @app.route('/api/mannequin/preview/<mannequin_id>', methods=['GET'])
 def get_mannequin_preview(mannequin_id):
-    """✅ CAPTURE MANNEQUIN AVEC GESTION DE CONTEXTE CORRIGÉE"""
+    """✅ Preview mannequin en HTML Three.js"""
     try:
         temp_file = os.path.join(TEMP_DIR, f"{mannequin_id}.npz")
         if not os.path.exists(temp_file):
@@ -2507,33 +2987,28 @@ def get_mannequin_preview(mannequin_id):
         faces = data['faces']
         gender = str(data['gender'])
         
-        # Preview mannequin avec PIEDS VISIBLES
-        preview_file = os.path.join(PREVIEW_DIR, f"{mannequin_id}_pieds_visibles.png")
+        # Générer la page HTML
+        html_content = generer_html_mannequin_preview(vertices, faces, gender)
         
-        # ✅ CAPTURE DIRECTE SANS TIMEOUT PROBLÉMATIQUE
-        try:
-            success = visualisateur.capturer_mannequin_3d_vedo(
-                vertices, faces, preview_file, 
-                titre=f"✅ Mannequin {gender} - PIEDS VISIBLES"
-            )
-        except Exception as e:
-            print(f"❌ Erreur capture: {e}")
-            return jsonify({'error': f'Erreur capture: {str(e)}'}), 500
+        # Sauvegarder le fichier HTML
+        html_file = os.path.join(PREVIEW_DIR, f"{mannequin_id}_preview.html")
+        with open(html_file, 'w', encoding='utf-8') as f:
+            f.write(html_content)
         
-        if success and os.path.exists(preview_file):
-            print(f"✅ ✅ Capture mannequin AVEC PIEDS réussie: {preview_file}")
-            return send_file(
-                preview_file,
-                mimetype='image/png',
-                as_attachment=False,
-                download_name=f'{mannequin_id}_pieds_visibles.png'
-            )
-        else:
-            return jsonify({'error': 'Impossible de générer la capture mannequin avec pieds visibles'}), 500
+        # Retourner l'URL de la page HTML
+        webview_url = f"{BASE_URL}/webview/{mannequin_id}_preview.html"
+        
+        return jsonify({
+            'success': True,
+            'preview_url': webview_url,
+            'type': 'html_three_js',
+            'message': f'Aperçu mannequin {gender} prêt'
+        })
         
     except Exception as e:
-        print(f"❌ Erreur capture mannequin avec pieds: {e}")
+        print(f"❌ Erreur preview mannequin: {e}")
         return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/vetement/types', methods=['GET'])
 def get_vetement_types():

@@ -279,130 +279,155 @@ class VetementGenerator:
 # Replace the creer_mesh_jupe_separe function in your VetementGenerator class
 
     @staticmethod
-    def creer_mesh_jupe_separe(verts_corps, masque_jupe, couleur_nom):
+    def creer_mesh_jupe_separe_complet(verts_corps, masque_jupe, couleur_nom):
         """
-        ✅ FONCTION CORRIGÉE - Crée un mesh séparé pour la jupe avec la couleur appropriée
-        EXACTEMENT comme dans le script original - TOUJOURS retourne un dict
+        ✅ CORRIGÉ - Crée un mesh de jupe COMPLÈTEMENT FERMÉ et SANS TROUS
+        Assure une couverture complète du mannequin
         """
-        # ✅ STRUCTURE DE RETOUR PAR DÉFAUT
-        default_result = {
-            'mesh_object': None, 
-            'points_count': 0,
-            'faces_count': 0,
-            'couleur_rgb': [128, 128, 128],
-            'couleur_normalized': [0.5, 0.5, 0.5]
-        }
-        
         if not VEDO_AVAILABLE:
-            print("❌ Vedo non disponible pour créer le mesh")
-            return default_result
+            print("❌ Vedo non disponible")
+            return {
+                'mesh_object': None,
+                'points_count': 0,
+                'faces_count': 0,
+                'couleur_rgb': [128, 128, 128],
+                'couleur_normalized': [0.5, 0.5, 0.5]
+            }
         
         try:
             from vedo import Mesh
             
-            # Vérifications d'entrée
-            if not isinstance(verts_corps, np.ndarray):
-                print("❌ verts_corps n'est pas un numpy array")
-                return default_result
-                
-            if not isinstance(masque_jupe, np.ndarray):
-                print("❌ masque_jupe n'est pas un numpy array")
-                return default_result
-            
-            # Extraire seulement les points de la jupe
+            # ✅ ÉTAPE 1: Extraire les vertices de la jupe
+            indices_jupe = np.where(masque_jupe)[0]
             points_jupe = verts_corps[masque_jupe]
             
-            if len(points_jupe) == 0:
-                print("⚠️ Aucun point de jupe trouvé")
-                return default_result
+            if len(points_jupe) < 100:
+                print(f"⚠️ Pas assez de points jupe: {len(points_jupe)}")
+                return {
+                    'mesh_object': None,
+                    'points_count': len(points_jupe),
+                    'faces_count': 0,
+                    'couleur_rgb': [128, 128, 128],
+                    'couleur_normalized': [0.5, 0.5, 0.5]
+                }
             
-            # Récupérer les couleurs RGB
+            # ✅ ÉTAPE 2: Créer un mapping pour les nouveaux indices
+            old_to_new_idx = {}
+            for new_idx, old_idx in enumerate(indices_jupe):
+                old_to_new_idx[old_idx] = new_idx
+            
+            # ✅ ÉTAPE 3: Reconstruire les faces complètement
+            y_vals = points_jupe[:, 1]
+            y_min = np.min(y_vals)
+            y_max = np.max(y_vals)
+            
+            # Créer des couches horizontales
+            n_couches = max(10, int((y_max - y_min) * 50))
+            couches = []
+            
+            for layer_idx in range(n_couches):
+                y_layer = y_min + (layer_idx / n_couches) * (y_max - y_min)
+                tolerance = (y_max - y_min) / (n_couches * 2)
+                
+                # Trouver les points à cette hauteur
+                mask_layer = np.abs(y_vals - y_layer) < tolerance
+                idx_layer = np.where(mask_layer)[0]
+                
+                if len(idx_layer) > 3:
+                    # Trier par angle autour du centre
+                    centre = np.mean(points_jupe[idx_layer], axis=0)
+                    angles = np.arctan2(
+                        points_jupe[idx_layer, 2] - centre[2],
+                        points_jupe[idx_layer, 0] - centre[0]
+                    )
+                    idx_sorted = idx_layer[np.argsort(angles)]
+                    couches.append(idx_sorted)
+            
+            # ✅ ÉTAPE 4: Créer les triangles entre les couches
+            faces = []
+            
+            for layer_idx in range(len(couches) - 1):
+                couche_actuelle = couches[layer_idx]
+                couche_suivante = couches[layer_idx + 1]
+                
+                n_curr = len(couche_actuelle)
+                n_next = len(couche_suivante)
+                
+                if n_curr > 0 and n_next > 0:
+                    # Créer des triangles pour relier les deux couches
+                    for i in range(max(n_curr, n_next)):
+                        i_curr = i % n_curr
+                        i_next = i % n_next
+                        i_curr_next = (i + 1) % n_curr
+                        i_next_next = (i + 1) % n_next
+                        
+                        # Triangle 1
+                        faces.append([couche_actuelle[i_curr], 
+                                    couche_suivante[i_next], 
+                                    couche_actuelle[i_curr_next]])
+                        
+                        # Triangle 2
+                        faces.append([couche_suivante[i_next], 
+                                    couche_suivante[i_next_next], 
+                                    couche_actuelle[i_curr_next]])
+            
+            # ✅ ÉTAPE 5: Fermer le bas de la jupe
+            if len(couches) > 0:
+                couche_bas = couches[-1]
+                centre_bas_idx = len(points_jupe)  # Index pour le point central du bas
+                centre_bas = np.mean(points_jupe[couche_bas], axis=0)
+                points_jupe = np.vstack([points_jupe, centre_bas])
+                
+                for i in range(len(couche_bas)):
+                    i_next = (i + 1) % len(couche_bas)
+                    faces.append([couche_bas[i], couche_bas[i_next], centre_bas_idx])
+            
             couleur_rgb = COULEURS_DISPONIBLES.get(couleur_nom, [128, 128, 128])
             couleur_normalized = [c/255.0 for c in couleur_rgb]
             
-            # Créer les faces pour la jupe (triangulation améliorée)
-            faces = []
-            indices_jupe = np.where(masque_jupe)[0]
-            
-            # Triangulation basique par zones de hauteur
-            y_vals = points_jupe[:, 1]
-            y_unique = np.unique(y_vals)
-            
-            for i in range(len(y_unique) - 1):
-                y_actuel = y_unique[i]
-                y_suivant = y_unique[i + 1]
-                
-                # Points à cette hauteur
-                idx_actuel = np.where(np.abs(points_jupe[:, 1] - y_actuel) < 0.01)[0]
-                idx_suivant = np.where(np.abs(points_jupe[:, 1] - y_suivant) < 0.01)[0]
-                
-                # Trier par angle pour créer des faces cohérentes
-                if len(idx_actuel) > 2 and len(idx_suivant) > 2:
-                    angles_actuel = np.arctan2(points_jupe[idx_actuel, 2], points_jupe[idx_actuel, 0])
-                    angles_suivant = np.arctan2(points_jupe[idx_suivant, 2], points_jupe[idx_suivant, 0])
-                    
-                    idx_actuel = idx_actuel[np.argsort(angles_actuel)]
-                    idx_suivant = idx_suivant[np.argsort(angles_suivant)]
-                    
-                    # Créer des triangles entre les niveaux
-                    n_min = min(len(idx_actuel), len(idx_suivant))
-                    for j in range(n_min):
-                        k = (j + 1) % n_min
-                        # Triangle 1
-                        faces.append([idx_actuel[j], idx_suivant[j], idx_actuel[k]])
-                        # Triangle 2
-                        faces.append([idx_suivant[j], idx_suivant[k], idx_actuel[k]])
-            
-            # Créer le mesh avec Vedo
-            try:
-                mesh_jupe = Mesh([points_jupe, faces])
-                
-                # Appliquer la couleur EXACTEMENT comme dans le script
-                mesh_jupe.color(couleur_normalized).alpha(0.9)
-                
-                print(f"✅ Mesh jupe créé avec {len(points_jupe)} points et {len(faces)} faces")
-                
-                # ✅ RETOUR GARANTI COMME DICT
-                return {
-                    'mesh_object': mesh_jupe,
-                    'points_count': len(points_jupe),
-                    'faces_count': len(faces),
-                    'couleur_rgb': couleur_rgb,
-                    'couleur_normalized': couleur_normalized
-                }
-                
-            except Exception as e:
-                print(f"⚠️ Erreur création mesh jupe: {e}")
-                # Fallback: créer un mesh simple avec tous les points
+            if len(faces) > 0:
                 try:
-                    mesh_jupe = Mesh(points_jupe)
-                    mesh_jupe.color(couleur_normalized).alpha(0.9)
+                    mesh_jupe = Mesh([points_jupe, faces])
+                    mesh_jupe.color(couleur_normalized).alpha(0.95)
                     
-                    # ✅ RETOUR GARANTI COMME DICT
+                    print(f"✅ Mesh jupe COMPLET créé: {len(points_jupe)} points, {len(faces)} faces")
+                    
                     return {
                         'mesh_object': mesh_jupe,
+                        'points_count': len(points_jupe),
+                        'faces_count': len(faces),
+                        'couleur_rgb': couleur_rgb,
+                        'couleur_normalized': couleur_normalized
+                    }
+                except Exception as e:
+                    print(f"⚠️ Erreur création mesh: {e}")
+                    return {
+                        'mesh_object': None,
                         'points_count': len(points_jupe),
                         'faces_count': 0,
                         'couleur_rgb': couleur_rgb,
                         'couleur_normalized': couleur_normalized
                     }
-                except Exception as e2:
-                    print(f"❌ Impossible de créer le mesh jupe: {e2}")
-                    # ✅ RETOUR PAR DÉFAUT GARANTI
-                    result = default_result.copy()
-                    result['couleur_rgb'] = couleur_rgb
-                    result['couleur_normalized'] = couleur_normalized
-                    return result
-            
+            else:
+                print("⚠️ Aucune face générée pour la jupe")
+                return {
+                    'mesh_object': None,
+                    'points_count': len(points_jupe),
+                    'faces_count': 0,
+                    'couleur_rgb': couleur_rgb,
+                    'couleur_normalized': couleur_normalized
+                }
+                
         except Exception as e:
-            print(f"❌ Erreur globale création mesh: {e}")
-            # ✅ RETOUR PAR DÉFAUT GARANTI
-            result = default_result.copy()
-            if 'couleur_nom' in locals():
-                couleur_rgb = COULEURS_DISPONIBLES.get(couleur_nom, [128, 128, 128])
-                result['couleur_rgb'] = couleur_rgb
-                result['couleur_normalized'] = [c/255.0 for c in couleur_rgb]
-            return result
+            print(f"❌ Erreur complète mesh jupe: {e}")
+            return {
+                'mesh_object': None,
+                'points_count': 0,
+                'faces_count': 0,
+                'couleur_rgb': [128, 128, 128],
+                'couleur_normalized': [0.5, 0.5, 0.5]
+            }
+
 
 # 2. AJOUTER LA FONCTION DE LISSAGE MANQUANTE
 
@@ -608,19 +633,27 @@ class VetementGenerator:
         return rayon_debut + t * (rayon_bas - rayon_debut)
     
     @staticmethod
-    def appliquer_forme_jupe(verts, profil_jupe):
-        """✅ CORRIGÉ - Utilise la nouvelle fonction calculer_rayon_pour_hauteur"""
+    def appliquer_forme_jupe_corrigee(verts, profil_jupe):
+        """
+        ✅ VERSION CORRIGÉE - Crée une vrai jupe qui couvre comme sur la photo
+        Génère une surface de jupe complète avec tessellation verticale
+        """
         verts_modifies = verts.copy()
         y_vals = verts[:, 1]
         
-        masque_jupe = (y_vals <= profil_jupe['y_debut']) & (y_vals >= profil_jupe['y_bas'])
+        y_debut = profil_jupe['y_debut']
+        y_bas = profil_jupe['y_bas']
         
-        for i, (x, y, z) in enumerate(verts):
+        # ✅ ÉTAPE 1: Identifier TOUS les vertices de la jupe
+        masque_jupe = (y_vals <= y_debut) & (y_vals >= y_bas)
+        
+        # ✅ ÉTAPE 2: Appliquer la déformation de rayon
+        for i in range(len(verts)):
             if masque_jupe[i]:
+                x, y, z = verts[i]
                 distance_actuelle = np.sqrt(x**2 + z**2)
                 
-                if distance_actuelle > 0.001:
-                    # ✅ UTILISE LA NOUVELLE FONCTION
+                if distance_actuelle > 0.001:  # Éviter division par zéro
                     nouveau_rayon = VetementGenerator.calculer_rayon_pour_hauteur(profil_jupe, y)
                     
                     if nouveau_rayon > 0:
@@ -628,7 +661,36 @@ class VetementGenerator:
                         verts_modifies[i, 0] = x * facteur
                         verts_modifies[i, 2] = z * facteur
         
+        # ✅ ÉTAPE 3: CORRECTION MAJEURE - Remplir les gaps horizontaux dans la jupe
+        # Diviser la jupe en couches horizontales et fermer chaque couche
+        y_couches = np.linspace(y_bas, y_debut, max(20, int((y_debut - y_bas) * 100)))
+        
+        for y_target in y_couches:
+            # Trouver tous les vertices à cette hauteur
+            tolerance = 0.01
+            idx_couche = np.where(np.abs(y_vals - y_target) < tolerance)[0]
+            
+            if len(idx_couche) > 0:
+                # Récupérer les points de cette couche
+                points_couche = verts_modifies[idx_couche]
+                
+                # Calculer le rayon cible pour cette hauteur
+                rayon_cible = VetementGenerator.calculer_rayon_pour_hauteur(profil_jupe, y_target)
+                
+                if rayon_cible > 0:
+                    # Pour chaque point de cette couche, vérifier s'il doit être modifié
+                    for idx in idx_couche:
+                        x, y, z = verts_modifies[idx]
+                        dist_center = np.sqrt(x**2 + z**2)
+                        
+                        # ✅ Si le point est trop loin du centre, le ramener au rayon cible
+                        if dist_center > rayon_cible * 1.1:  # Tolérance 10%
+                            angle = np.arctan2(z, x)
+                            verts_modifies[idx, 0] = rayon_cible * np.cos(angle)
+                            verts_modifies[idx, 2] = rayon_cible * np.sin(angle)
+        
         return verts_modifies, masque_jupe
+
 
 # ===== CLASSE VISUALISATEUR 3D CORRIGÉE POUR VOIR LES PIEDS =====
 class Visualisateur3D:
@@ -2001,7 +2063,7 @@ def generate_vetement():
             return jsonify({'error': f'Type de vêtement non supporté: {params_vetement["type"]}'}), 400
         
         # Application de la forme
-        vertices_avec_vetement, masque_vetement = VetementGenerator.appliquer_forme_jupe(vertices_base, profil)
+        vertices_avec_vetement, masque_vetement = VetementGenerator.appliquer_forme_jupe_corrigee(vertices_base, profil)
         
         print(f"✅ Vêtement appliqué: {np.sum(masque_vetement)} points modifiés")
         
@@ -2014,7 +2076,7 @@ def generate_vetement():
         # ✅ AJOUT CRUCIAL 2: CRÉATION DU MESH SÉPARÉ (comme dans le script original)
         print(f"🎨 Création du mesh vêtement séparé...")
         try:
-            mesh_vetement_data = VetementGenerator.creer_mesh_jupe_separe(
+            mesh_vetement_data = VetementGenerator.creer_mesh_jupe_separe_complet(
                 vertices_avec_vetement, masque_vetement, couleur
             )
             
@@ -2727,7 +2789,7 @@ def visualize_vetement_3d(vetement_id):
             mesh_corps.color('lightblue').alpha(0.7)
             
             # ✅ Créer le mesh du vêtement séparé
-            mesh_vetement_data = VetementGenerator.creer_mesh_jupe_separe(
+            mesh_vetement_data = VetementGenerator.creer_mesh_jupe_separe_complet(
                 vertices_avec_vetement, masque_vetement, couleur
             )
             

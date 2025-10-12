@@ -282,7 +282,6 @@ class VetementGenerator:
     def creer_mesh_jupe_separe(verts_corps, masque_jupe, couleur_nom):
         """
         CORRIGÉE - Crée un mesh de jupe COMPLÈTEMENT FERMÉ et SANS TROUS
-        Assure une couverture complète du mannequin
         """
         default_result = {
             'mesh_object': None, 
@@ -299,7 +298,6 @@ class VetementGenerator:
         try:
             from vedo import Mesh
             
-            # Vérifications d'entrée
             if not isinstance(verts_corps, np.ndarray):
                 print("verts_corps n'est pas un numpy array")
                 return default_result
@@ -308,7 +306,6 @@ class VetementGenerator:
                 print("masque_jupe n'est pas un numpy array")
                 return default_result
             
-            # Extraire les points de la jupe
             indices_jupe = np.where(masque_jupe)[0]
             points_jupe = verts_corps[masque_jupe]
             
@@ -316,7 +313,6 @@ class VetementGenerator:
                 print(f"Pas assez de points jupe: {len(points_jupe)}")
                 return default_result
             
-            # Créer les couches horizontales
             y_vals = points_jupe[:, 1]
             y_min = np.min(y_vals)
             y_max = np.max(y_vals)
@@ -328,12 +324,10 @@ class VetementGenerator:
                 y_layer = y_min + (layer_idx / (n_couches - 1)) * (y_max - y_min) if n_couches > 1 else y_min
                 tolerance = (y_max - y_min) / (n_couches * 2)
                 
-                # Trouver les points à cette hauteur
                 mask_layer = np.abs(y_vals - y_layer) < tolerance
                 idx_layer = np.where(mask_layer)[0]
                 
                 if len(idx_layer) > 3:
-                    # Trier par angle autour du centre
                     centre = np.mean(points_jupe[idx_layer], axis=0)
                     angles = np.arctan2(
                         points_jupe[idx_layer, 2] - centre[2],
@@ -346,7 +340,6 @@ class VetementGenerator:
                 print("Pas assez de couches pour créer le mesh")
                 return default_result
             
-            # Créer les triangles entre les couches
             faces = []
             
             for layer_idx in range(len(couches) - 1):
@@ -372,7 +365,6 @@ class VetementGenerator:
                                     couche_suivante[i_next_next], 
                                     couche_actuelle[i_curr_next]])
             
-            # Fermer le bas de la jupe
             if len(couches) > 0:
                 couche_bas = couches[-1]
                 centre_bas = np.mean(points_jupe[couche_bas], axis=0)
@@ -410,7 +402,8 @@ class VetementGenerator:
         except Exception as e:
             print(f"Erreur complète mesh jupe: {e}")
             return default_result
-
+        
+        
 # 2. AJOUTER LA FONCTION DE LISSAGE MANQUANTE
 
     @staticmethod
@@ -618,7 +611,6 @@ class VetementGenerator:
     def appliquer_forme_jupe(verts, profil_jupe):
         """
         CORRIGÉE - Crée une vraie jupe qui couvre complètement le mannequin
-        Génère une surface de jupe complète avec tessellation verticale
         """
         verts_modifies = verts.copy()
         y_vals = verts[:, 1]
@@ -626,16 +618,14 @@ class VetementGenerator:
         y_debut = profil_jupe['y_debut']
         y_bas = profil_jupe['y_bas']
         
-        # Identifier TOUS les vertices de la jupe
         masque_jupe = (y_vals <= y_debut) & (y_vals >= y_bas)
         
-        # Appliquer la déformation de rayon
         for i in range(len(verts)):
             if masque_jupe[i]:
                 x, y, z = verts[i]
                 distance_actuelle = np.sqrt(x**2 + z**2)
                 
-                if distance_actuelle > 0.001:  # Éviter division par zéro
+                if distance_actuelle > 0.001:
                     nouveau_rayon = VetementGenerator.calculer_rayon_pour_hauteur(profil_jupe, y)
                     
                     if nouveau_rayon > 0:
@@ -643,7 +633,6 @@ class VetementGenerator:
                         verts_modifies[i, 0] = x * facteur
                         verts_modifies[i, 2] = z * facteur
         
-        # Remplir les gaps horizontaux dans la jupe en ajoutant des vertices synthétiques
         y_couches = np.linspace(y_bas, y_debut, max(20, int((y_debut - y_bas) * 100)))
         vertices_synthétiques = []
         
@@ -651,11 +640,10 @@ class VetementGenerator:
             tolerance = (y_debut - y_bas) / 50
             idx_couche = np.where(np.abs(y_vals - y_target) < tolerance)[0]
             
-            if len(idx_couche) < 8:  # Pas assez de points à cette hauteur
+            if len(idx_couche) < 8:
                 rayon_cible = VetementGenerator.calculer_rayon_pour_hauteur(profil_jupe, y_target)
                 
                 if rayon_cible > 0:
-                    # Créer une couronne complète de vertices
                     n_points = 32
                     angles = np.linspace(0, 2 * np.pi, n_points, endpoint=False)
                     
@@ -669,7 +657,6 @@ class VetementGenerator:
             verts_modifies = np.vstack([verts_modifies, vertices_synthétiques])
         
         return verts_modifies, masque_jupe
-
 
 # ===== CLASSE VISUALISATEUR 3D CORRIGÉE POUR VOIR LES PIEDS =====
 class Visualisateur3D:

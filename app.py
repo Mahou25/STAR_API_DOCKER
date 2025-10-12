@@ -1671,12 +1671,6 @@ def generer_html_vetement_3d(vertices_corps, vertices_avec_vetement, faces, masq
         <div id="info">
             <div><strong>🎭 {type_vetement}</strong></div>
             <div><span class="color-indicator"></span>{couleur}</div>
-            <div>👆 Faites glisser pour tourner</div>
-            <div>🤏 Pincez pour zoomer</div>
-            <div style="margin-top: 10px; font-size: 12px;">
-                Vertices: {len(vertices_avec_vetement)}<br>
-                Vêtement: {sum(masque_vetement)} points
-            </div>
         </div>
         
         <div id="controls">

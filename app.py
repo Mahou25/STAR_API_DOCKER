@@ -2029,7 +2029,7 @@ def generate_vetement():
             return jsonify({'error': f'Type de vêtement non supporté: {params_vetement["type"]}'}), 400
         
         # Application de la forme
-        vertices_avec_vetement, masque_vetement = VetementGenerator.appliquer_forme_jupe_corrigee(vertices_base, profil)
+        vertices_avec_vetement, masque_vetement = VetementGenerator.appliquer_forme_jupe(vertices_base, profil)
         
         print(f"✅ Vêtement appliqué: {np.sum(masque_vetement)} points modifiés")
         

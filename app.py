@@ -2328,8 +2328,6 @@ def generer_html_vetement_preview(vertices_corps, vertices_avec_vetement, faces,
             <span class="color-swatch"></span>
             <span>{type_vetement}</span>
         </div>
-        <div class="info-detail">Couleur: {couleur}</div>
-        <div class="info-detail">Rendu réaliste avec éclairage avancé</div>
     </div>
 
     <script>

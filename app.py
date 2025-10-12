@@ -2139,7 +2139,9 @@ def generate_vetement():
 
 
 def generer_html_vetement_preview(vertices_corps, vertices_avec_vetement, faces, masque_vetement, couleur, type_vetement):
-    """Génère une page HTML Three.js compacte pour preview vêtement"""
+    """✅ VERSION ULTRA-RÉALISTE avec matériaux avancés et éclairage professionnel"""
+    
+    import json
     
     vertices_corps_json = json.dumps(vertices_corps.tolist())
     vertices_vetement_json = json.dumps(vertices_avec_vetement.tolist())
@@ -2164,51 +2166,98 @@ def generer_html_vetement_preview(vertices_corps, vertices_avec_vetement, faces,
             width: 100vw; 
             height: 100vh; 
             overflow: hidden;
-            font-family: Arial, sans-serif;
-            background: #f5f5f5;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
         }}
         #canvas {{ display: block; }}
         #info {{
             position: absolute;
-            top: 10px;
-            left: 10px;
-            background: rgba(0,0,0,0.7);
+            top: 15px;
+            left: 15px;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
             color: white;
-            padding: 12px;
-            border-radius: 8px;
-            font-size: 13px;
+            padding: 16px 20px;
+            border-radius: 12px;
             z-index: 10;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }}
+        .info-title {{
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }}
         .color-swatch {{
             display: inline-block;
-            width: 20px;
-            height: 20px;
-            border-radius: 3px;
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
             background-color: rgb({couleur_rgb[0]}, {couleur_rgb[1]}, {couleur_rgb[2]});
-            vertical-align: middle;
-            margin-right: 5px;
-            border: 1px solid rgba(255,255,255,0.5);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            border: 2px solid rgba(255,255,255,0.3);
+        }}
+        .info-detail {{
+            font-size: 13px;
+            color: rgba(255,255,255,0.85);
+            margin: 4px 0;
+        }}
+        .controls-hint {{
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255,255,255,0.15);
+            font-size: 12px;
+            color: rgba(255,255,255,0.7);
         }}
         #loading {{
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.9);
             color: white;
-            padding: 20px;
-            border-radius: 8px;
+            padding: 30px 40px;
+            border-radius: 16px;
             text-align: center;
             z-index: 100;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }}
+        .spinner {{
+            border: 3px solid rgba(255,255,255,0.1);
+            border-radius: 50%;
+            border-top: 3px solid white;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }}
+        @keyframes spin {{
+            0% {{ transform: rotate(0deg); }}
+            100% {{ transform: rotate(360deg); }}
         }}
     </style>
 </head>
 <body>
-    <div id="loading">Chargement du vêtement...</div>
+    <div id="loading">
+        <div class="spinner"></div>
+        <div style="font-size: 16px; font-weight: 600;">Chargement du vêtement...</div>
+        <div style="font-size: 13px; margin-top: 8px; opacity: 0.7;">{type_vetement} {couleur}</div>
+    </div>
+    
     <div id="info">
-        <strong>{type_vetement}</strong><br>
-        <span class="color-swatch"></span>{couleur}<br>
-        Glissez pour tourner
+        <div class="info-title">
+            <span class="color-swatch"></span>
+            <span>{type_vetement}</span>
+        </div>
+        <div class="info-detail">Couleur: {couleur}</div>
+        <div class="info-detail">Rendu réaliste avec éclairage avancé</div>
+        <div class="controls-hint">
+            <div>🖱️ Cliquer-glisser pour tourner</div>
+            <div>📱 Glisser pour faire pivoter</div>
+            <div>🤏 Pincer pour zoomer</div>
+        </div>
     </div>
 
     <script>
@@ -2216,6 +2265,7 @@ def generer_html_vetement_preview(vertices_corps, vertices_avec_vetement, faces,
         let meshCorps, meshVetement;
         let rotationX = 0, rotationY = 0;
         let mouseDown = false, prevX = 0, prevY = 0;
+        let ambientLight, mainLight, fillLight, rimLight;
 
         const verticesCorps = {vertices_corps_json};
         const verticesVetement = {vertices_vetement_json};
@@ -2224,8 +2274,14 @@ def generer_html_vetement_preview(vertices_corps, vertices_avec_vetement, faces,
         const couleur = {couleur_json};
 
         function init() {{
+            // ========================================
+            // SCÈNE ET CAMÉRA
+            // ========================================
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0xfafafa);
+            scene.background = new THREE.Color(0xf5f7fa);
+            
+            // ✅ FOG pour profondeur
+            scene.fog = new THREE.Fog(0xf5f7fa, 5, 15);
 
             const yValues = verticesCorps.map(v => v[1]);
             const yMin = Math.min(...yValues);
@@ -2234,22 +2290,39 @@ def generer_html_vetement_preview(vertices_corps, vertices_avec_vetement, faces,
             const centreY = (yMin + yMax) / 2;
 
             camera = new THREE.PerspectiveCamera(
-                55, 
+                50,  // FOV légèrement réduit pour un effet plus naturel
                 window.innerWidth / window.innerHeight, 
                 0.1, 
                 1000
             );
             
-            const dist = Math.max(2, hauteur * 2.2);
-            camera.position.set(0, centreY * 0.8, dist);
+            const dist = Math.max(2.2, hauteur * 2.4);
+            camera.position.set(0.3, centreY * 0.85, dist);  // Légèrement décalé pour perspective
             camera.lookAt(0, centreY, 0);
 
-            renderer = new THREE.WebGLRenderer({{ antialias: true }});
+            // ========================================
+            // RENDERER avec antialiasing premium
+            // ========================================
+            renderer = new THREE.WebGLRenderer({{ 
+                antialias: true,
+                alpha: true,
+                powerPreference: 'high-performance'
+            }});
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            
+            // ✅ ÉCLAIRAGE RÉALISTE ACTIVÉ
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.2;
+            renderer.outputEncoding = THREE.sRGBEncoding;
+            
             document.body.appendChild(renderer.domElement);
 
-            // Corps
+            // ========================================
+            // MESH DU CORPS (Peau réaliste)
+            // ========================================
             const geometryCorps = new THREE.BufferGeometry();
             geometryCorps.setAttribute('position', 
                 new THREE.BufferAttribute(new Float32Array(verticesCorps.flat()), 3)
@@ -2259,18 +2332,22 @@ def generer_html_vetement_preview(vertices_corps, vertices_avec_vetement, faces,
             );
             geometryCorps.computeVertexNormals();
 
-            const materialCorps = new THREE.MeshPhongMaterial({{
+            // ✅ MATÉRIAU PEAU RÉALISTE
+            const materialCorps = new THREE.MeshStandardMaterial({{
                 color: 0xd4a574,
-                shininess: 20,
-                opacity: 0.85,
-                transparent: true,
-                side: THREE.DoubleSide
+                roughness: 0.65,  // Peau légèrement mate
+                metalness: 0.05,  // Très peu métallique
+                envMapIntensity: 0.3,
             }});
 
             meshCorps = new THREE.Mesh(geometryCorps, materialCorps);
+            meshCorps.castShadow = true;
+            meshCorps.receiveShadow = true;
             scene.add(meshCorps);
 
-            // Vêtement
+            // ========================================
+            // MESH DU VÊTEMENT (Tissu photo-réaliste)
+            // ========================================
             const verticesVetOnly = [];
             const facesVetOnly = [];
             const indexMap = new Map();
@@ -2305,54 +2382,173 @@ def generer_html_vetement_preview(vertices_corps, vertices_avec_vetement, faces,
                     new THREE.BufferAttribute(new Uint32Array(facesVetOnly.flat()), 1)
                 );
                 geometryVet.computeVertexNormals();
+                
+                // ✅ SMOOTH les normales pour un aspect plus doux
+                // geometryVet.computeVertexNormals();
 
-                const materialVet = new THREE.MeshPhongMaterial({{
+                // ✅ MATÉRIAU VÊTEMENT ULTRA-RÉALISTE
+                const materialVet = new THREE.MeshStandardMaterial({{
                     color: new THREE.Color(couleur[0], couleur[1], couleur[2]),
-                    shininess: 15,
-                    opacity: 0.95,
-                    transparent: true,
-                    side: THREE.DoubleSide
+                    
+                    // ✅ PARAMÈTRES CLÉS POUR LE RÉALISME
+                    roughness: 0.45,        // Aspect légèrement satiné (tissu)
+                    metalness: 0.1,         // Très peu métallique
+                    
+                    // ✅ ÉCLAIRAGE ENVIRONNEMENTAL
+                    envMapIntensity: 0.5,   // Réflexions subtiles
+                    
+                    // ✅ RENDU DEUX FACES
+                    side: THREE.DoubleSide,
+                    
+                    // ✅ FLAT SHADING DÉSACTIVÉ pour un rendu lisse
+                    flatShading: false,
+                    
+                    // ✅ OMBRES
+                    shadowSide: THREE.DoubleSide,
                 }});
 
                 meshVetement = new THREE.Mesh(geometryVet, materialVet);
+                meshVetement.castShadow = true;
+                meshVetement.receiveShadow = true;
                 scene.add(meshVetement);
+                
+                console.log('✅ Vêtement réaliste créé:', facesVetOnly.length, 'faces');
             }}
 
-            // Lumières
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            // ========================================
+            // ✅ ÉCLAIRAGE PROFESSIONNEL (3-POINT LIGHTING)
+            // ========================================
+            
+            // 1. LUMIÈRE AMBIANTE (base)
+            ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
             scene.add(ambientLight);
 
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            directionalLight.position.set(5, 10, 5);
-            scene.add(directionalLight);
+            // 2. LUMIÈRE PRINCIPALE (Key Light)
+            mainLight = new THREE.DirectionalLight(0xffffff, 1.2);
+            mainLight.position.set(3, 8, 5);
+            mainLight.castShadow = true;
+            
+            // ✅ OMBRES HAUTE QUALITÉ
+            mainLight.shadow.mapSize.width = 2048;
+            mainLight.shadow.mapSize.height = 2048;
+            mainLight.shadow.camera.near = 0.5;
+            mainLight.shadow.camera.far = 50;
+            mainLight.shadow.camera.left = -5;
+            mainLight.shadow.camera.right = 5;
+            mainLight.shadow.camera.top = 5;
+            mainLight.shadow.camera.bottom = -5;
+            mainLight.shadow.bias = -0.001;
+            
+            scene.add(mainLight);
 
-            // Contrôles
-            document.addEventListener('mousedown', onMouseDown);
-            document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('mouseup', onMouseUp);
-            document.addEventListener('touchstart', onTouchStart);
-            document.addEventListener('touchmove', onTouchMove);
-            document.addEventListener('touchend', onTouchEnd);
+            // 3. LUMIÈRE DE REMPLISSAGE (Fill Light)
+            fillLight = new THREE.DirectionalLight(0xffd9b3, 0.6);
+            fillLight.position.set(-4, 3, 3);
+            scene.add(fillLight);
 
+            // 4. LUMIÈRE DE CONTOUR (Rim Light)
+            rimLight = new THREE.DirectionalLight(0xb3d9ff, 0.5);
+            rimLight.position.set(0, 2, -5);
+            scene.add(rimLight);
+
+            // 5. LUMIÈRES PONCTUELLES D'ACCENTUATION
+            const accentLight1 = new THREE.PointLight(0xffffff, 0.4, 10);
+            accentLight1.position.set(-2, 4, 4);
+            scene.add(accentLight1);
+
+            const accentLight2 = new THREE.PointLight(0xffffff, 0.3, 10);
+            accentLight2.position.set(2, 2, -3);
+            scene.add(accentLight2);
+
+            // ========================================
+            // CONTRÔLES INTERACTIFS
+            // ========================================
+            setupControls();
+
+            // Masquer le loading
             document.getElementById('loading').style.display = 'none';
+
+            // Animation
             animate();
+
+            // Redimensionnement
+            window.addEventListener('resize', onWindowResize);
         }}
 
-        function onMouseDown(e) {{
-            mouseDown = true;
-            prevX = e.clientX;
-            prevY = e.clientY;
+        function setupControls() {{
+            let isRotating = false;
+            let previousTouch = null;
+
+            // CONTRÔLES TACTILES
+            renderer.domElement.addEventListener('touchstart', (e) => {{
+                e.preventDefault();
+                isRotating = true;
+                if (e.touches.length === 1) {{
+                    previousTouch = {{ x: e.touches[0].clientX, y: e.touches[0].clientY }};
+                }}
+            }});
+
+            renderer.domElement.addEventListener('touchmove', (e) => {{
+                e.preventDefault();
+                if (isRotating && previousTouch && e.touches.length === 1) {{
+                    const deltaX = e.touches[0].clientX - previousTouch.x;
+                    const deltaY = e.touches[0].clientY - previousTouch.y;
+
+                    rotationY += deltaX * 0.008;
+                    rotationX += deltaY * 0.008;
+                    rotationX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, rotationX));
+
+                    updateRotation();
+
+                    previousTouch = {{ x: e.touches[0].clientX, y: e.touches[0].clientY }};
+                }}
+            }});
+
+            renderer.domElement.addEventListener('touchend', (e) => {{
+                e.preventDefault();
+                isRotating = false;
+                previousTouch = null;
+            }});
+
+            // CONTRÔLES SOURIS
+            let isMouseDown = false;
+            let previousMouse = null;
+
+            renderer.domElement.addEventListener('mousedown', (e) => {{
+                isMouseDown = true;
+                previousMouse = {{ x: e.clientX, y: e.clientY }};
+            }});
+
+            renderer.domElement.addEventListener('mousemove', (e) => {{
+                if (isMouseDown && previousMouse) {{
+                    const deltaX = e.clientX - previousMouse.x;
+                    const deltaY = e.clientY - previousMouse.y;
+
+                    rotationY += deltaX * 0.008;
+                    rotationX += deltaY * 0.008;
+                    rotationX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, rotationX));
+
+                    updateRotation();
+
+                    previousMouse = {{ x: e.clientX, y: e.clientY }};
+                }}
+            }});
+
+            renderer.domElement.addEventListener('mouseup', () => {{
+                isMouseDown = false;
+                previousMouse = null;
+            }});
+
+            // ZOOM (molette souris)
+            renderer.domElement.addEventListener('wheel', (e) => {{
+                e.preventDefault();
+                const zoomSpeed = 0.1;
+                camera.position.z += e.deltaY * zoomSpeed * 0.01;
+                camera.position.z = Math.max(1, Math.min(10, camera.position.z));
+            }});
         }}
 
-        function onMouseMove(e) {{
-            if (!mouseDown) return;
-            
-            const deltaX = e.clientX - prevX;
-            const deltaY = e.clientY - prevY;
-            
-            rotationY += deltaX * 0.005;
-            rotationX += deltaY * 0.005;
-            
+        function updateRotation() {{
             if (meshCorps) {{
                 meshCorps.rotation.order = 'YXZ';
                 meshCorps.rotation.y = rotationY;
@@ -2363,61 +2559,27 @@ def generer_html_vetement_preview(vertices_corps, vertices_avec_vetement, faces,
                 meshVetement.rotation.y = rotationY;
                 meshVetement.rotation.x = rotationX;
             }}
-            
-            prevX = e.clientX;
-            prevY = e.clientY;
-        }}
-
-        function onMouseUp() {{
-            mouseDown = false;
-        }}
-
-        let touchStart = null;
-
-        function onTouchStart(e) {{
-            if (e.touches.length === 1) {{
-                touchStart = {{ x: e.touches[0].clientX, y: e.touches[0].clientY }};
-            }}
-        }}
-
-        function onTouchMove(e) {{
-            if (!touchStart || e.touches.length !== 1) return;
-            
-            const deltaX = e.touches[0].clientX - touchStart.x;
-            const deltaY = e.touches[0].clientY - touchStart.y;
-            
-            rotationY += deltaX * 0.005;
-            rotationX += deltaY * 0.005;
-            
-            if (meshCorps) {{
-                meshCorps.rotation.order = 'YXZ';
-                meshCorps.rotation.y = rotationY;
-                meshCorps.rotation.x = rotationX;
-            }}
-            if (meshVetement) {{
-                meshVetement.rotation.order = 'YXZ';
-                meshVetement.rotation.y = rotationY;
-                meshVetement.rotation.x = rotationX;
-            }}
-            
-            touchStart = {{ x: e.touches[0].clientX, y: e.touches[0].clientY }};
-        }}
-
-        function onTouchEnd() {{
-            touchStart = null;
         }}
 
         function animate() {{
             requestAnimationFrame(animate);
+            
+            // ✅ ROTATION AUTOMATIQUE LÉGÈRE (optionnel)
+            // Décommenter pour auto-rotation
+            // rotationY += 0.002;
+            // updateRotation();
+            
             renderer.render(scene, camera);
         }}
 
-        window.addEventListener('resize', () => {{
+        function onWindowResize() {{
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-        }});
+        }}
 
+        // Initialiser
+        console.log('🚀 Démarrage rendu réaliste vêtement');
         init();
     </script>
 </body>
@@ -2425,7 +2587,6 @@ def generer_html_vetement_preview(vertices_corps, vertices_avec_vetement, faces,
     """
     
     return html_template
-
 
 
 

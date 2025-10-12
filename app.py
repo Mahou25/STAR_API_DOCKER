@@ -2042,7 +2042,7 @@ def generate_vetement():
         # ✅ AJOUT CRUCIAL 2: CRÉATION DU MESH SÉPARÉ (comme dans le script original)
         print(f"🎨 Création du mesh vêtement séparé...")
         try:
-            mesh_vetement_data = VetementGenerator.creer_mesh_jupe_separe_complet(
+            mesh_vetement_data = VetementGenerator.creer_mesh_jupe_separe(
                 vertices_avec_vetement, masque_vetement, couleur
             )
             
@@ -2755,7 +2755,7 @@ def visualize_vetement_3d(vetement_id):
             mesh_corps.color('lightblue').alpha(0.7)
             
             # ✅ Créer le mesh du vêtement séparé
-            mesh_vetement_data = VetementGenerator.creer_mesh_jupe_separe_complet(
+            mesh_vetement_data = VetementGenerator.creer_mesh_jupe_separe(
                 vertices_avec_vetement, masque_vetement, couleur
             )
             

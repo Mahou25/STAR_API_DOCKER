@@ -492,7 +492,10 @@ class VetementGenerator:
 
     @staticmethod
     def calculer_profil_jupe_droite(points_anat, longueur_relative):
-        """✅ CORRIGÉ - Plus de fonction locale dans le retour"""
+        """
+        ✅ CORRIGÉ - Profil jupe droite avec COUVERTURE COMPLÈTE
+        PROBLÈME RÉSOLU: Rayons trop petits ne couvraient pas ventre/cuisses
+        """
         y_taille = points_anat['y_taille']
         y_hanches = points_anat['y_hanches']
         y_min = points_anat['y_min']
@@ -501,15 +504,29 @@ class VetementGenerator:
         rayon_taille = points_anat['rayon_taille']
         rayon_hanches = points_anat['rayon_hanches']
         
+        # Position verticale (inchangée)
         y_debut_jupe = y_taille - 0.03
         y_bas_jupe = y_hanches - (longueur_relative * hauteur_totale)
         y_bas_jupe = max(y_bas_jupe, y_min + 0.1)
         
-        rayon_debut = rayon_taille * 0.88
-        rayon_hanches_jupe = rayon_hanches * 0.95
-        rayon_bas = rayon_hanches_jupe * 1.02
+        # ✅ CORRECTION CLÉS: RAYONS AUGMENTÉS pour couvrir 100%
+        # Avant: 0.88 (trop petit, laissait voir le ventre)
+        # Après: 1.10 (couvre complètement le ventre)
+        rayon_debut = rayon_taille * 1.10  # ← AUGMENTÉ de 0.88 à 1.10 (+25%)
         
-        # ✅ SOLUTION 1: Retourner les paramètres au lieu de la fonction
+        # Avant: 0.95 (trop petit, laissait voir les hanches)
+        # Après: 1.15 (couvre complètement les hanches)
+        rayon_hanches_jupe = rayon_hanches * 1.15  # ← AUGMENTÉ de 0.95 à 1.15 (+21%)
+        
+        # Avant: 1.02 (trop petit pour les cuisses)
+        # Après: 1.18 (couvre complètement les cuisses)
+        rayon_bas = rayon_hanches_jupe * 1.18  # ← AUGMENTÉ de 1.02 à 1.18 (+16%)
+        
+        print(f"🔧 PROFIL JUPE DROITE CORRIGÉ:")
+        print(f"   Rayon taille: {rayon_debut:.3f} (taille_corp={rayon_taille:.3f} × 1.10)")
+        print(f"   Rayon hanches: {rayon_hanches_jupe:.3f} (hanches_corp={rayon_hanches:.3f} × 1.15)")
+        print(f"   Rayon bas: {rayon_bas:.3f} (hanches_jupe × 1.18)")
+        
         return {
             'type': 'droite',
             'y_debut': y_debut_jupe,

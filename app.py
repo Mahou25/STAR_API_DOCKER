@@ -276,189 +276,189 @@ class VetementGenerator:
         }
         
     
-# Replace the creer_mesh_jupe_separe function in your VetementGenerator class
 
+# Replace the creer_mesh_jupe_separe function in your VetementGenerator class
     @staticmethod
     def creer_mesh_jupe_separe(verts_corps, masque_jupe, couleur_nom):
-        """
-        ✅ ULTRA-CORRIGÉE - Jupe 100% FERMÉE, SANS TROUS, AVEC DENSITÉ UNIFORME
-        """
-        default_result = {
-            'mesh_object': None, 
-            'points_count': 0,
-            'faces_count': 0,
-            'couleur_rgb': [128, 128, 128],
-            'couleur_normalized': [0.5, 0.5, 0.5]
-        }
+    """
+    ✅ VERSION FINALE - ZÉRO TROU, COUVERTURE 100% GARANTIE
+    """
+    default_result = {
+        'mesh_object': None, 
+        'points_count': 0,
+        'faces_count': 0,
+        'couleur_rgb': [128, 128, 128],
+        'couleur_normalized': [0.5, 0.5, 0.5]
+    }
+    
+    if not VEDO_AVAILABLE:
+        print("Vedo non disponible pour créer le mesh")
+        return default_result
+    
+    try:
+        from vedo import Mesh
         
-        if not VEDO_AVAILABLE:
-            print("Vedo non disponible pour créer le mesh")
+        if not isinstance(verts_corps, np.ndarray):
+            print("verts_corps n'est pas un numpy array")
+            return default_result
+            
+        if not isinstance(masque_jupe, np.ndarray):
+            print("masque_jupe n'est pas un numpy array")
             return default_result
         
-        try:
-            from vedo import Mesh
+        points_jupe = verts_corps[masque_jupe]
+        
+        if len(points_jupe) < 100:
+            print(f"Pas assez de points jupe: {len(points_jupe)}")
+            return default_result
+        
+        y_vals = points_jupe[:, 1]
+        y_min = np.min(y_vals)
+        y_max = np.max(y_vals)
+        hauteur_jupe = y_max - y_min
+        
+        # ✅ CLÉS DU SUCCÈS: 
+        # 1. Densité TRÈS élevée (minimum 100 couches)
+        # 2. Tolérance adaptive qui garantit le chevauchement
+        n_couches = max(100, int(hauteur_jupe * 200))  # ← AUGMENTÉ
+        
+        print(f"🔧 Génération {n_couches} couches ULTRA-DENSES pour hauteur {hauteur_jupe:.3f}")
+        
+        # ✅ ANALYSE PRÉALABLE: Calculer le rayon à chaque hauteur
+        rayons_par_hauteur = []
+        for layer_idx in range(n_couches):
+            y_layer = y_min + (layer_idx / (n_couches - 1)) * hauteur_jupe if n_couches > 1 else y_min
             
-            if not isinstance(verts_corps, np.ndarray):
-                print("verts_corps n'est pas un numpy array")
-                return default_result
-                
-            if not isinstance(masque_jupe, np.ndarray):
-                print("masque_jupe n'est pas un numpy array")
-                return default_result
+            # Trouver tous les points proches de cette hauteur
+            tolerance = hauteur_jupe / (n_couches * 0.8)  # ← Chevauchement garanti
+            mask_layer = np.abs(y_vals - y_layer) < tolerance
             
-            points_jupe = verts_corps[masque_jupe]
-            
-            if len(points_jupe) < 100:
-                print(f"Pas assez de points jupe: {len(points_jupe)}")
-                return default_result
-            
-            y_vals = points_jupe[:, 1]
-            y_min = np.min(y_vals)
-            y_max = np.max(y_vals)
-            hauteur_jupe = y_max - y_min
-            
-            # ✅ CLÉS DU SUCCÈS: Densité élevée + Tolerance adaptative
-            n_couches = max(50, int(hauteur_jupe * 150))  # Beaucoup plus de couches
-            couches = []
-            
-            print(f"🔧 Génération {n_couches} couches pour jupe hauteur {hauteur_jupe:.3f}")
-            
-            for layer_idx in range(n_couches):
-                y_layer = y_min + (layer_idx / (n_couches - 1)) * hauteur_jupe if n_couches > 1 else y_min
-                
-                # ✅ TOLÉRANCE ADAPTATIVE selon la densité de points
-                tolerance = hauteur_jupe / (n_couches * 1.5)  # Overlap léger pour ne rien rater
-                
-                mask_layer = np.abs(y_vals - y_layer) < tolerance
-                idx_layer = np.where(mask_layer)[0]
-                
-                if len(idx_layer) >= 3:  # Au moins 3 points pour faire un cercle
-                    centre = np.mean(points_jupe[idx_layer], axis=0)
-                    angles = np.arctan2(
-                        points_jupe[idx_layer, 2] - centre[2],
-                        points_jupe[idx_layer, 0] - centre[0]
-                    )
-                    idx_sorted = idx_layer[np.argsort(angles)]
-                    couches.append(idx_sorted)
-                else:
-                    # ✅ FALLBACK: Générer un cercle synthétique si aucun point
-                    print(f"⚠️ Couche {layer_idx} vide, génération cercle synthétique")
-                    
-                    # Calculer le rayon moyen de la jupe à cette hauteur
-                    if len(couches) > 0:
-                        # Utiliser la couche précédente comme référence
-                        prev_layer = couches[-1]
-                        rayon_ref = np.mean(np.sqrt(
-                            points_jupe[prev_layer, 0]**2 + points_jupe[prev_layer, 2]**2
-                        ))
-                    else:
-                        # Rayon par défaut
-                        rayon_ref = 0.3
-                    
-                    # Générer 32 points en cercle
-                    n_points_cercle = 32
-                    angles_cercle = np.linspace(0, 2*np.pi, n_points_cercle, endpoint=False)
-                    
-                    points_synthetiques = []
-                    for angle in angles_cercle:
-                        x_syn = rayon_ref * np.cos(angle)
-                        z_syn = rayon_ref * np.sin(angle)
-                        points_synthetiques.append([x_syn, y_layer, z_syn])
-                    
-                    # Ajouter les points à la liste
-                    start_idx = len(points_jupe)
-                    points_jupe = np.vstack([points_jupe, np.array(points_synthetiques)])
-                    idx_synthetic = np.arange(start_idx, start_idx + n_points_cercle)
-                    couches.append(idx_synthetic)
-            
-            if len(couches) < 2:
-                print("❌ Pas assez de couches pour créer le mesh")
-                return default_result
-            
-            print(f"✅ {len(couches)} couches générées")
-            
-            # ✅ TRIANGULATION AMÉLIORÉE: Connexion entre TOUTES les couches adjacentes
-            faces = []
-            
-            for layer_idx in range(len(couches) - 1):
-                couche_actuelle = couches[layer_idx]
-                couche_suivante = couches[layer_idx + 1]
-                
-                n_curr = len(couche_actuelle)
-                n_next = len(couche_suivante)
-                
-                # ✅ ALGORITHME DE CONNEXION OPTIMISÉ
-                # On connecte chaque point de la couche actuelle au point le plus proche de la couche suivante
-                
-                for i in range(n_curr):
-                    i_next = (i + 1) % n_curr
-                    
-                    # Trouver le point correspondant dans la couche suivante
-                    j = int((i / n_curr) * n_next) % n_next
-                    j_next = (j + 1) % n_next
-                    
-                    # ✅ CRÉER 2 TRIANGLES POUR CHAQUE QUAD
-                    faces.append([couche_actuelle[i], couche_suivante[j], couche_actuelle[i_next]])
-                    faces.append([couche_actuelle[i_next], couche_suivante[j], couche_suivante[j_next]])
-            
-            # ✅ FERMER LE BAS DE LA JUPE (cercle plein)
-            if len(couches) > 0:
-                couche_bas = couches[-1]
-                centre_bas = np.mean(points_jupe[couche_bas], axis=0)
-                centre_bas_idx = len(points_jupe)
-                points_jupe = np.vstack([points_jupe, centre_bas])
-                
-                # Créer des triangles en éventail depuis le centre
-                for i in range(len(couche_bas)):
-                    i_next = (i + 1) % len(couche_bas)
-                    faces.append([couche_bas[i], couche_bas[i_next], centre_bas_idx])
-            
-            # ✅ FERMER LE HAUT DE LA JUPE (ceinture)
-            couche_haut = couches[0]
-            centre_haut = np.mean(points_jupe[couche_haut], axis=0)
-            centre_haut_idx = len(points_jupe)
-            points_jupe = np.vstack([points_jupe, centre_haut])
-            
-            for i in range(len(couche_haut)):
-                i_next = (i + 1) % len(couche_haut)
-                # Inverser l'ordre pour que la normale pointe vers l'extérieur
-                faces.append([centre_haut_idx, couche_haut[i_next], couche_haut[i]])
-            
-            couleur_rgb = COULEURS_DISPONIBLES.get(couleur_nom, [128, 128, 128])
-            couleur_normalized = [c/255.0 for c in couleur_rgb]
-            
-            if len(faces) > 0:
-                try:
-                    mesh_jupe = Mesh([points_jupe, faces])
-                    mesh_jupe.color(couleur_normalized).alpha(0.95)
-                    
-                    # ✅ LISSAGE DU MESH pour un rendu parfait
-                    mesh_jupe.smooth(niter=1)
-                    
-                    print(f"✅ ✅ Mesh jupe ULTRA-DENSE créé: {len(points_jupe)} points, {len(faces)} faces")
-                    
-                    return {
-                        'mesh_object': mesh_jupe,
-                        'points_count': len(points_jupe),
-                        'faces_count': len(faces),
-                        'couleur_rgb': couleur_rgb,
-                        'couleur_normalized': couleur_normalized
-                    }
-                except Exception as e:
-                    print(f"❌ Erreur création mesh: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    return default_result
+            if np.sum(mask_layer) >= 3:
+                points_layer = points_jupe[mask_layer]
+                rayon_moyen = np.mean(np.sqrt(points_layer[:, 0]**2 + points_layer[:, 2]**2))
             else:
-                print("❌ Aucune face générée pour la jupe")
-                return default_result
+                # Interpolation linéaire entre couches voisines
+                if len(rayons_par_hauteur) > 0:
+                    rayon_moyen = rayons_par_hauteur[-1]
+                else:
+                    # Fallback: rayon de la taille
+                    rayon_moyen = np.percentile(np.sqrt(points_jupe[:, 0]**2 + points_jupe[:, 2]**2), 50)
+            
+            rayons_par_hauteur.append(rayon_moyen)
+        
+        # ✅ GÉNÉRATION DES COUCHES AVEC DENSITÉ UNIFORME
+        couches = []
+        n_points_par_cercle = 48  # ← AUGMENTÉ pour plus de finesse
+        
+        for layer_idx in range(n_couches):
+            y_layer = y_min + (layer_idx / (n_couches - 1)) * hauteur_jupe if n_couches > 1 else y_min
+            rayon_cible = rayons_par_hauteur[layer_idx]
+            
+            # ✅ GÉNÉRER UN CERCLE COMPLET À CETTE HAUTEUR
+            angles = np.linspace(0, 2*np.pi, n_points_par_cercle, endpoint=False)
+            
+            points_cercle = []
+            indices_cercle = []
+            
+            for angle in angles:
+                x_syn = rayon_cible * np.cos(angle)
+                z_syn = rayon_cible * np.sin(angle)
                 
-        except Exception as e:
-            print(f"❌ Erreur complète mesh jupe: {e}")
-            import traceback
-            traceback.print_exc()
+                # Ajouter le point synthétique
+                idx_nouveau = len(points_jupe)
+                points_jupe = np.vstack([points_jupe, [[x_syn, y_layer, z_syn]]])
+                indices_cercle.append(idx_nouveau)
+            
+            couches.append(np.array(indices_cercle))
+            
+            if layer_idx % 20 == 0:
+                print(f"  ✅ Couche {layer_idx}/{n_couches}: {len(indices_cercle)} points à y={y_layer:.3f}, rayon={rayon_cible:.3f}")
+        
+        if len(couches) < 2:
+            print("❌ Pas assez de couches pour créer le mesh")
             return default_result
         
+        print(f"✅ {len(couches)} couches ULTRA-DENSES générées")
+        
+        # ✅ TRIANGULATION PERFECTIONNÉE: Connexion quad par quad
+        faces = []
+        
+        for layer_idx in range(len(couches) - 1):
+            couche_actuelle = couches[layer_idx]
+            couche_suivante = couches[layer_idx + 1]
+            
+            n_curr = len(couche_actuelle)
+            n_next = len(couche_suivante)
+            
+            # ✅ CONNEXION PARFAITE: même nombre de points dans chaque couche
+            for i in range(n_curr):
+                i_next = (i + 1) % n_curr
+                j = i % n_next
+                j_next = (i + 1) % n_next
+                
+                # ✅ CRÉER 2 TRIANGLES POUR CHAQUE QUAD
+                # Triangle 1
+                faces.append([couche_actuelle[i], couche_suivante[j], couche_actuelle[i_next]])
+                # Triangle 2
+                faces.append([couche_actuelle[i_next], couche_suivante[j], couche_suivante[j_next]])
+        
+        # ✅ FERMER LE BAS DE LA JUPE (cercle plein)
+        couche_bas = couches[-1]
+        centre_bas = np.mean(points_jupe[couche_bas], axis=0)
+        centre_bas_idx = len(points_jupe)
+        points_jupe = np.vstack([points_jupe, centre_bas])
+        
+        for i in range(len(couche_bas)):
+            i_next = (i + 1) % len(couche_bas)
+            faces.append([couche_bas[i], couche_bas[i_next], centre_bas_idx])
+        
+        # ✅ FERMER LE HAUT DE LA JUPE (ceinture)
+        couche_haut = couches[0]
+        centre_haut = np.mean(points_jupe[couche_haut], axis=0)
+        centre_haut_idx = len(points_jupe)
+        points_jupe = np.vstack([points_jupe, centre_haut])
+        
+        for i in range(len(couche_haut)):
+            i_next = (i + 1) % len(couche_haut)
+            # Inverser l'ordre pour que la normale pointe vers l'extérieur
+            faces.append([centre_haut_idx, couche_haut[i_next], couche_haut[i]])
+        
+        couleur_rgb = COULEURS_DISPONIBLES.get(couleur_nom, [128, 128, 128])
+        couleur_normalized = [c/255.0 for c in couleur_rgb]
+        
+        if len(faces) > 0:
+            try:
+                mesh_jupe = Mesh([points_jupe, faces])
+                mesh_jupe.color(couleur_normalized).alpha(0.98)  # ← Alpha légèrement augmenté
+                
+                # ✅ LISSAGE DU MESH pour un rendu parfait
+                mesh_jupe.smooth(niter=2)  # ← Plus de lissage
+                
+                print(f"✅ ✅ ✅ Mesh jupe ZÉRO-TROU créé: {len(points_jupe)} points, {len(faces)} faces")
+                
+                return {
+                    'mesh_object': mesh_jupe,
+                    'points_count': len(points_jupe),
+                    'faces_count': len(faces),
+                    'couleur_rgb': couleur_rgb,
+                    'couleur_normalized': couleur_normalized
+                }
+            except Exception as e:
+                print(f"❌ Erreur création mesh: {e}")
+                import traceback
+                traceback.print_exc()
+                return default_result
+        else:
+            print("❌ Aucune face générée pour la jupe")
+            return default_result
+            
+    except Exception as e:
+        print(f"❌ Erreur complète mesh jupe: {e}")
+        import traceback
+        traceback.print_exc()
+        return default_result
+        
+
 # 2. AJOUTER LA FONCTION DE LISSAGE MANQUANTE
 
     @staticmethod

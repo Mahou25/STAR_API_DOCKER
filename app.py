@@ -493,8 +493,8 @@ class VetementGenerator:
     @staticmethod
     def calculer_profil_jupe_droite(points_anat, longueur_relative):
         """
-        ✅ JUPE DROITE ÉLÉGANTE - Épouse parfaitement les formes du mannequin
-        Design: Ajustée à la taille, suit les hanches naturellement, légèrement évasée au bas
+        ✅ JUPE DROITE PARFAITE - Couvre 100% du corps (taille, hanches, cuisses)
+        Correction: Extension du rayon au niveau des cuisses pour couverture totale
         """
         y_taille = points_anat['y_taille']
         y_hanches = points_anat['y_hanches']
@@ -505,28 +505,34 @@ class VetementGenerator:
         rayon_hanches = points_anat['rayon_hanches']
         
         # Position verticale
-        y_debut_jupe = y_taille - 0.02  # ← Ajustement plus haut pour mieux épouser la taille
+        y_debut_jupe = y_taille - 0.02
         y_bas_jupe = y_hanches - (longueur_relative * hauteur_totale)
         y_bas_jupe = max(y_bas_jupe, y_min + 0.1)
         
-        # ✅ DESIGN ÉLÉGANT: Épouser les formes naturelles
-        # Zone taille: Ajustée mais pas serrée (confortable)
-        rayon_debut = rayon_taille * 1.02  # ← Suit la taille de près (+2% pour confort)
+        # ✅ RAYONS AUGMENTÉS pour couverture 100%
+        # Zone taille: Ajustée confortablement
+        rayon_debut = rayon_taille * 1.08  # ← Augmenté de 1.02 à 1.08 (+6%)
         
-        # Zone hanches: Suit parfaitement la courbe naturelle
-        rayon_hanches_jupe = rayon_hanches * 1.05  # ← Épouse les hanches (+5% pour fluidité)
+        # Zone hanches: Suit les courbes avec marge
+        rayon_hanches_jupe = rayon_hanches * 1.12  # ← Augmenté de 1.05 à 1.12 (+7%)
         
-        # Bas de jupe: Légèrement évasé pour l'élégance et le mouvement
-        rayon_bas = rayon_hanches * 1.12  # ← Évasement subtil pour grâce (+12%)
+        # ✅ CORRECTION CLÉS: Bas de jupe (cuisses) LARGEMENT augmenté
+        # Avant: × 1.12 (cuisses visibles)
+        # Après: × 1.25 (cuisses 100% couvertes)
+        rayon_bas = rayon_hanches * 1.25  # ← AUGMENTÉ de 1.12 à 1.25 (+13%)
         
-        # Point de contrôle supplémentaire pour transition douce taille->hanches
+        # Points intermédiaires pour courbe fluide
         y_mi_hanches = (y_debut_jupe + y_hanches) / 2
         rayon_mi_hanches = (rayon_debut + rayon_hanches_jupe) / 2
         
-        print(f"👗 PROFIL JUPE DROITE ÉLÉGANTE:")
-        print(f"   ✨ Taille (ajustée): {rayon_debut:.3f}m (corps={rayon_taille:.3f}m × 1.02)")
-        print(f"   💃 Hanches (épousées): {rayon_hanches_jupe:.3f}m (corps={rayon_hanches:.3f}m × 1.05)")
-        print(f"   🌊 Bas (évasé): {rayon_bas:.3f}m (hanches × 1.12)")
+        # ✅ NOUVEAU: Point mi-cuisses pour transition douce
+        y_mi_cuisses = (y_hanches + y_bas_jupe) / 2
+        rayon_mi_cuisses = (rayon_hanches_jupe + rayon_bas) / 2
+        
+        print(f"👗 PROFIL JUPE DROITE - CUISSES COUVERTES:")
+        print(f"   ✨ Taille: {rayon_debut:.3f}m (corps={rayon_taille:.3f}m × 1.08)")
+        print(f"   💃 Hanches: {rayon_hanches_jupe:.3f}m (corps={rayon_hanches:.3f}m × 1.12)")
+        print(f"   🦵 Cuisses (bas): {rayon_bas:.3f}m (hanches × 1.25) ← CORRECTION")
         print(f"   📏 Longueur: {y_debut_jupe - y_bas_jupe:.3f}m")
         
         return {
@@ -537,11 +543,14 @@ class VetementGenerator:
             'rayon_hanches_jupe': rayon_hanches_jupe,
             'rayon_bas': rayon_bas,
             'y_hanches': y_hanches,
-            # ✅ NOUVEAU: Points intermédiaires pour courbe fluide
+            # Points intermédiaires pour courbe ultra-fluide
             'y_mi_hanches': y_mi_hanches,
-            'rayon_mi_hanches': rayon_mi_hanches
+            'rayon_mi_hanches': rayon_mi_hanches,
+            # ✅ NOUVEAU: Point mi-cuisses
+            'y_mi_cuisses': y_mi_cuisses,
+            'rayon_mi_cuisses': rayon_mi_cuisses
         }
-            
+                
     
     @staticmethod
     def calculer_profil_jupe_ovale(points_anat, longueur_relative, ampleur=1.4):
@@ -626,16 +635,18 @@ class VetementGenerator:
     @staticmethod
     def _calculer_rayon_droite(profil, y):
         """
-        ✅ CALCUL RAYON JUPE DROITE - Courbes fluides pour épouser le corps
+        ✅ CALCUL RAYON JUPE DROITE - Avec point mi-cuisses pour couverture totale
         """
         y_debut = profil['y_debut']
         y_bas = profil['y_bas']
         y_hanches = profil['y_hanches']
         y_mi_hanches = profil.get('y_mi_hanches', (y_debut + y_hanches) / 2)
+        y_mi_cuisses = profil.get('y_mi_cuisses', (y_hanches + y_bas) / 2)
         
         rayon_debut = profil['rayon_debut']
         rayon_mi_hanches = profil.get('rayon_mi_hanches', (profil['rayon_debut'] + profil['rayon_hanches_jupe']) / 2)
         rayon_hanches_jupe = profil['rayon_hanches_jupe']
+        rayon_mi_cuisses = profil.get('rayon_mi_cuisses', (profil['rayon_hanches_jupe'] + profil['rayon_bas']) / 2)
         rayon_bas = profil['rayon_bas']
         
         # ✅ ZONE 1: TAILLE → MI-HANCHES (transition douce)
@@ -643,8 +654,7 @@ class VetementGenerator:
             if y_debut == y_mi_hanches:
                 return rayon_debut
             t = (y_debut - y) / (y_debut - y_mi_hanches)
-            # Courbe légèrement incurvée pour suivre le corps naturellement
-            t_smooth = 0.5 * (1 - np.cos(np.pi * t))  # ← Courbe sinusoïdale douce
+            t_smooth = 0.5 * (1 - np.cos(np.pi * t))
             return rayon_debut + t_smooth * (rayon_mi_hanches - rayon_debut)
         
         # ✅ ZONE 2: MI-HANCHES → HANCHES (suit la courbe des hanches)
@@ -652,17 +662,26 @@ class VetementGenerator:
             if y_mi_hanches == y_hanches:
                 return rayon_mi_hanches
             t = (y_mi_hanches - y) / (y_mi_hanches - y_hanches)
-            # Courbe naturelle pour épouser les hanches
             t_smooth = 0.5 * (1 - np.cos(np.pi * t))
             return rayon_mi_hanches + t_smooth * (rayon_hanches_jupe - rayon_mi_hanches)
         
-        # ✅ ZONE 3: HANCHES → BAS (évasement élégant)
-        else:
-            if y_hanches == y_bas:
+        # ✅ ZONE 3: HANCHES → MI-CUISSES (transition vers cuisses)
+        elif y >= y_mi_cuisses:
+            if y_hanches == y_mi_cuisses:
                 return rayon_hanches_jupe
-            t = (y_hanches - y) / (y_hanches - y_bas)
-            # Évasement progressif linéaire pour fluidité du mouvement
-            return rayon_hanches_jupe + t * (rayon_bas - rayon_hanches_jupe)
+            t = (y_hanches - y) / (y_hanches - y_mi_cuisses)
+            t_smooth = 0.5 * (1 - np.cos(np.pi * t))
+            return rayon_hanches_jupe + t_smooth * (rayon_mi_cuisses - rayon_hanches_jupe)
+        
+        # ✅ ZONE 4: MI-CUISSES → BAS (couverture totale cuisses)
+        else:
+            if y_mi_cuisses == y_bas:
+                return rayon_mi_cuisses
+            t = (y_mi_cuisses - y) / (y_mi_cuisses - y_bas)
+            # Évasement progressif pour couvrir les cuisses
+            t_smooth = 0.5 * (1 - np.cos(np.pi * t))
+            return rayon_mi_cuisses + t_smooth * (rayon_bas - rayon_mi_cuisses)
+    
     
     
     @staticmethod

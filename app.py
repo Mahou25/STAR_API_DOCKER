@@ -493,8 +493,8 @@ class VetementGenerator:
     @staticmethod
     def calculer_profil_jupe_droite(points_anat, longueur_relative):
         """
-        ✅ CORRIGÉ - Profil jupe droite avec COUVERTURE COMPLÈTE
-        PROBLÈME RÉSOLU: Rayons trop petits ne couvraient pas ventre/cuisses
+        ✅ JUPE DROITE ÉLÉGANTE - Épouse parfaitement les formes du mannequin
+        Design: Ajustée à la taille, suit les hanches naturellement, légèrement évasée au bas
         """
         y_taille = points_anat['y_taille']
         y_hanches = points_anat['y_hanches']
@@ -504,28 +504,30 @@ class VetementGenerator:
         rayon_taille = points_anat['rayon_taille']
         rayon_hanches = points_anat['rayon_hanches']
         
-        # Position verticale (inchangée)
-        y_debut_jupe = y_taille - 0.03
+        # Position verticale
+        y_debut_jupe = y_taille - 0.02  # ← Ajustement plus haut pour mieux épouser la taille
         y_bas_jupe = y_hanches - (longueur_relative * hauteur_totale)
         y_bas_jupe = max(y_bas_jupe, y_min + 0.1)
         
-        # ✅ CORRECTION CLÉS: RAYONS AUGMENTÉS pour couvrir 100%
-        # Avant: 0.88 (trop petit, laissait voir le ventre)
-        # Après: 1.10 (couvre complètement le ventre)
-        rayon_debut = rayon_taille * 1.10  # ← AUGMENTÉ de 0.88 à 1.10 (+25%)
+        # ✅ DESIGN ÉLÉGANT: Épouser les formes naturelles
+        # Zone taille: Ajustée mais pas serrée (confortable)
+        rayon_debut = rayon_taille * 1.02  # ← Suit la taille de près (+2% pour confort)
         
-        # Avant: 0.95 (trop petit, laissait voir les hanches)
-        # Après: 1.15 (couvre complètement les hanches)
-        rayon_hanches_jupe = rayon_hanches * 1.15  # ← AUGMENTÉ de 0.95 à 1.15 (+21%)
+        # Zone hanches: Suit parfaitement la courbe naturelle
+        rayon_hanches_jupe = rayon_hanches * 1.05  # ← Épouse les hanches (+5% pour fluidité)
         
-        # Avant: 1.02 (trop petit pour les cuisses)
-        # Après: 1.18 (couvre complètement les cuisses)
-        rayon_bas = rayon_hanches_jupe * 1.18  # ← AUGMENTÉ de 1.02 à 1.18 (+16%)
+        # Bas de jupe: Légèrement évasé pour l'élégance et le mouvement
+        rayon_bas = rayon_hanches * 1.12  # ← Évasement subtil pour grâce (+12%)
         
-        print(f"🔧 PROFIL JUPE DROITE CORRIGÉ:")
-        print(f"   Rayon taille: {rayon_debut:.3f} (taille_corp={rayon_taille:.3f} × 1.10)")
-        print(f"   Rayon hanches: {rayon_hanches_jupe:.3f} (hanches_corp={rayon_hanches:.3f} × 1.15)")
-        print(f"   Rayon bas: {rayon_bas:.3f} (hanches_jupe × 1.18)")
+        # Point de contrôle supplémentaire pour transition douce taille->hanches
+        y_mi_hanches = (y_debut_jupe + y_hanches) / 2
+        rayon_mi_hanches = (rayon_debut + rayon_hanches_jupe) / 2
+        
+        print(f"👗 PROFIL JUPE DROITE ÉLÉGANTE:")
+        print(f"   ✨ Taille (ajustée): {rayon_debut:.3f}m (corps={rayon_taille:.3f}m × 1.02)")
+        print(f"   💃 Hanches (épousées): {rayon_hanches_jupe:.3f}m (corps={rayon_hanches:.3f}m × 1.05)")
+        print(f"   🌊 Bas (évasé): {rayon_bas:.3f}m (hanches × 1.12)")
+        print(f"   📏 Longueur: {y_debut_jupe - y_bas_jupe:.3f}m")
         
         return {
             'type': 'droite',
@@ -534,9 +536,13 @@ class VetementGenerator:
             'rayon_debut': rayon_debut,
             'rayon_hanches_jupe': rayon_hanches_jupe,
             'rayon_bas': rayon_bas,
-            'y_hanches': y_hanches
+            'y_hanches': y_hanches,
+            # ✅ NOUVEAU: Points intermédiaires pour courbe fluide
+            'y_mi_hanches': y_mi_hanches,
+            'rayon_mi_hanches': rayon_mi_hanches
         }
-        
+            
+    
     @staticmethod
     def calculer_profil_jupe_ovale(points_anat, longueur_relative, ampleur=1.4):
         """✅ CORRIGÉ - Plus de fonction locale dans le retour"""
@@ -619,25 +625,45 @@ class VetementGenerator:
     
     @staticmethod
     def _calculer_rayon_droite(profil, y):
-        """Calcul spécifique pour jupe droite"""
+        """
+        ✅ CALCUL RAYON JUPE DROITE - Courbes fluides pour épouser le corps
+        """
         y_debut = profil['y_debut']
         y_bas = profil['y_bas']
         y_hanches = profil['y_hanches']
+        y_mi_hanches = profil.get('y_mi_hanches', (y_debut + y_hanches) / 2)
         
         rayon_debut = profil['rayon_debut']
+        rayon_mi_hanches = profil.get('rayon_mi_hanches', (profil['rayon_debut'] + profil['rayon_hanches_jupe']) / 2)
         rayon_hanches_jupe = profil['rayon_hanches_jupe']
         rayon_bas = profil['rayon_bas']
         
-        if y >= y_hanches:
-            if y_debut == y_hanches:
+        # ✅ ZONE 1: TAILLE → MI-HANCHES (transition douce)
+        if y >= y_mi_hanches:
+            if y_debut == y_mi_hanches:
                 return rayon_debut
-            t = (y_debut - y) / (y_debut - y_hanches)
-            return rayon_debut + t * (rayon_hanches_jupe - rayon_debut)
+            t = (y_debut - y) / (y_debut - y_mi_hanches)
+            # Courbe légèrement incurvée pour suivre le corps naturellement
+            t_smooth = 0.5 * (1 - np.cos(np.pi * t))  # ← Courbe sinusoïdale douce
+            return rayon_debut + t_smooth * (rayon_mi_hanches - rayon_debut)
+        
+        # ✅ ZONE 2: MI-HANCHES → HANCHES (suit la courbe des hanches)
+        elif y >= y_hanches:
+            if y_mi_hanches == y_hanches:
+                return rayon_mi_hanches
+            t = (y_mi_hanches - y) / (y_mi_hanches - y_hanches)
+            # Courbe naturelle pour épouser les hanches
+            t_smooth = 0.5 * (1 - np.cos(np.pi * t))
+            return rayon_mi_hanches + t_smooth * (rayon_hanches_jupe - rayon_mi_hanches)
+        
+        # ✅ ZONE 3: HANCHES → BAS (évasement élégant)
         else:
             if y_hanches == y_bas:
                 return rayon_hanches_jupe
             t = (y_hanches - y) / (y_hanches - y_bas)
+            # Évasement progressif linéaire pour fluidité du mouvement
             return rayon_hanches_jupe + t * (rayon_bas - rayon_hanches_jupe)
+    
     
     @staticmethod
     def _calculer_rayon_ovale(profil, y):

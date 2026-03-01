@@ -162,134 +162,112 @@ class MannequinGenerator:
         return True
     
     def calculer_mesures_modele(self, vertices, joints, mapping):
-    """
-    Mesure le vrai périmètre de coupe (comme un mètre ruban)
-    """
-    mesures = {}
-    
-    for mesure, info in mapping.items():
-        joint_indices = info["joints"]
-        
-        if len(joint_indices) == 2:
-            # Distances directes (hauteur, longueur bras) → inchangé
-            mesures[mesure] = euclidean(joints[joint_indices[0]], joints[joint_indices[1]])
-            
-        elif len(joint_indices) == 1:
-            # ✅ VRAI TOUR DE CORPS par coupe horizontale
-            joint_pos = joints[joint_indices[0]]
-            y_cible = joint_pos[1]
-            
-            # 1. Trancher le corps à cette hauteur (tolérance fine)
-            tolerance = 0.015  # ~1.5cm
-            masque = np.abs(vertices[:, 1] - y_cible) < tolerance
-            points_coupe = vertices[masque]
-            
-            # Si pas assez de points, élargir légèrement
-            if len(points_coupe) < 20:
-                tolerance = 0.03
+        """
+        Mesure le vrai périmètre de coupe (comme un mètre ruban)
+        """
+        mesures = {}
+
+        for mesure, info in mapping.items():
+            joint_indices = info["joints"]
+
+            if len(joint_indices) == 2:
+                mesures[mesure] = euclidean(joints[joint_indices[0]], joints[joint_indices[1]])
+
+            elif len(joint_indices) == 1:
+                joint_pos = joints[joint_indices[0]]
+                y_cible = joint_pos[1]
+
+                tolerance = 0.015
                 masque = np.abs(vertices[:, 1] - y_cible) < tolerance
                 points_coupe = vertices[masque]
-            
-            if len(points_coupe) < 10:
-                mesures[mesure] = 50.0
-                continue
-            
-            # 2. Projeter sur le plan XZ (vue de dessus)
-            points_2d = points_coupe[:, [0, 2]]  # garder X et Z uniquement
-            
-            # 3. Calculer le centre de masse de la coupe
-            centre = np.mean(points_2d, axis=0)
-            
-            # 4. Trier les points par angle (pour reconstituer le contour)
-            angles = np.arctan2(
-                points_2d[:, 1] - centre[1],
-                points_2d[:, 0] - centre[0]
-            )
-            ordre = np.argsort(angles)
-            contour = points_2d[ordre]
-            
-            # 5. Calculer le périmètre réel du contour
-            perimeter = 0.0
-            n = len(contour)
-            for i in range(n):
-                p1 = contour[i]
-                p2 = contour[(i + 1) % n]  # boucle fermée
-                perimeter += np.linalg.norm(p2 - p1)
-            
-            mesures[mesure] = perimeter
-    
-    return mesures
+
+                if len(points_coupe) < 20:
+                    tolerance = 0.03
+                    masque = np.abs(vertices[:, 1] - y_cible) < tolerance
+                    points_coupe = vertices[masque]
+
+                if len(points_coupe) < 10:
+                    mesures[mesure] = 50.0
+                    continue
+
+                points_2d = points_coupe[:, [0, 2]]
+                centre = np.mean(points_2d, axis=0)
+
+                angles = np.arctan2(
+                    points_2d[:, 1] - centre[1],
+                    points_2d[:, 0] - centre[0]
+                )
+                ordre = np.argsort(angles)
+                contour = points_2d[ordre]
+
+                perimeter = 0.0
+                n = len(contour)
+                for i in range(n):
+                    p1 = contour[i]
+                    p2 = contour[(i + 1) % n]
+                    perimeter += np.linalg.norm(p2 - p1)
+
+                mesures[mesure] = perimeter
+
+        return mesures
     
     def deformer_modele(self, mesures_cibles, mesures_actuelles):
-    if self.shapedirs is None:
-        return self.v_template, np.zeros(10)
-    
-    n_betas = min(10, self.shapedirs.shape[2])
-    
-    def objective(betas):
-        # 1. Déformer les vertices avec ces betas
-        vertices_deformed = self.v_template + np.sum(
+        if self.shapedirs is None:
+            print("Pas de blend shapes disponibles")
+            return self.v_template, np.zeros(10)
+
+        n_betas = min(10, self.shapedirs.shape[2])
+
+        def objective(betas):
+            vertices_deformed = self.v_template + np.sum(
+                self.shapedirs[:, :, :n_betas] * betas[None, None, :], axis=2
+            )
+            joints_deformed = self.J_regressor.dot(vertices_deformed)
+
+            mesures_reelles = self.calculer_mesures_modele(
+                vertices_deformed, joints_deformed, DEFAULT_MAPPING
+            )
+
+            error = 0.0
+            for mesure, valeur_cible in mesures_cibles.items():
+                if mesure not in mesures_reelles:
+                    continue
+                valeur_modele = mesures_reelles[mesure]
+                valeur_cible_m = valeur_cible / 100.0
+                poids = 2.0 if mesure in ['tour_taille', 'tour_hanches'] else 1.0
+                error += poids * ((valeur_modele - valeur_cible_m) ** 2)
+
+            regularization = 0.05 * np.sum(betas ** 2)
+            return error + regularization
+
+        initial_betas = np.zeros(n_betas)
+        bounds = [(-5, 5)] * n_betas
+
+        result = minimize(
+            objective,
+            initial_betas,
+            method='L-BFGS-B',
+            bounds=bounds,
+            options={
+                'maxiter': 200,
+                'ftol': 1e-9,
+                'gtol': 1e-7
+            }
+        )
+
+        betas = result.x
+        vertices_final = self.v_template + np.sum(
             self.shapedirs[:, :, :n_betas] * betas[None, None, :], axis=2
         )
-        joints_deformed = self.J_regressor.dot(vertices_deformed)
-        
-        # 2. ✅ Mesurer VRAIMENT les vertices déformés
-        mesures_reelles = self.calculer_mesures_modele(
-            vertices_deformed, joints_deformed, DEFAULT_MAPPING
-        )
-        
-        # 3. Comparer aux cibles (convertir cm → mètres si nécessaire)
-        error = 0.0
-        for mesure, valeur_cible in mesures_cibles.items():
-            if mesure not in mesures_reelles:
-                continue
-            
-            valeur_modele = mesures_reelles[mesure]
-            
-            # Les mesures utilisateur sont en cm, le modèle est en mètres
-            valeur_cible_m = valeur_cible / 100.0
-            
-            # Pondération : taille et hanches comptent plus
-            poids = 2.0 if mesure in ['tour_taille', 'tour_hanches'] else 1.0
-            
-            error += poids * ((valeur_modele - valeur_cible_m) ** 2)
-        
-        # Régularisation pour éviter des déformations extrêmes
-        regularization = 0.05 * np.sum(betas ** 2)
-        return error + regularization
-    
-    initial_betas = np.zeros(n_betas)
-    bounds = [(-5, 5)] * n_betas  # Élargi de (-3,3) à (-5,5)
-    
-    result = minimize(
-        objective,
-        initial_betas,
-        method='L-BFGS-B',
-        bounds=bounds,
-        options={
-            'maxiter': 200,    # Plus d'itérations
-            'ftol': 1e-9,      # Convergence plus fine
-            'gtol': 1e-7
-        }
-    )
-    
-    betas = result.x
-    vertices_final = self.v_template + np.sum(
-        self.shapedirs[:, :, :n_betas] * betas[None, None, :], axis=2
-    )
-    
-    print(f"✅ Optimisation: {result.nit} itérations, erreur finale={result.fun:.6f}")
-    print(f"   Betas utilisés: {np.round(betas, 3)}")
-    
-    # Vérification : afficher les mesures obtenues
-    joints_final = self.J_regressor.dot(vertices_final)
-    mesures_finales = self.calculer_mesures_modele(vertices_final, joints_final, DEFAULT_MAPPING)
-    for m, v in mesures_finales.items():
-        if m in mesures_cibles:
-            print(f"   {m}: obtenu={v*100:.1f}cm, cible={mesures_cibles[m]}cm")
-    
-    return vertices_final, betas
-    
+
+        joints_final = self.J_regressor.dot(vertices_final)
+        mesures_finales = self.calculer_mesures_modele(vertices_final, joints_final, DEFAULT_MAPPING)
+        print(f"✅ Optimisation terminée: {result.nit} itérations")
+        for m, v in mesures_finales.items():
+            if m in mesures_cibles:
+                print(f"   {m}: obtenu={v*100:.1f}cm | cible={mesures_cibles[m]}cm")
+
+        return vertices_final, betas
 class VetementGenerator:
     """CLASSE CORRIGÉE - Plus d'erreur de sérialisation"""
     
